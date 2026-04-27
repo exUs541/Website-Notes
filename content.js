@@ -918,7 +918,7 @@ function setupDrawingBoard(svg, bar) {
       tools.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTool = btn.dataset.tool;
-      svg.style.pointerEvents = ['draw','rect','ellipse','eraser'].includes(activeTool) ? 'all' : 'none';
+      svg.style.pointerEvents = ['draw','rect','ellipse','line','eraser'].includes(activeTool) ? 'all' : 'none';
       if (activeTool === 'eraser') svg.style.cursor = 'crosshair';
       else if (activeTool !== 'cursor' && activeTool !== 'highlight') svg.style.cursor = 'crosshair';
       else svg.style.cursor = 'default';
