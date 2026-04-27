@@ -93,6 +93,10 @@ function updatePinnedPositions() {
       el.style.top  = `${note.pageY - scrollY}px`;
     }
   });
+  const svg = shadow.querySelector('#webnote-drawing-board');
+  if (svg) {
+    svg.style.transform = `translate(${-scrollX}px, ${-scrollY}px)`;
+  }
 }
 
 // ── UI Shell ──────────────────────────────────────────────────────────────────
@@ -878,13 +882,15 @@ function renderDrawings() {
 }
 
 function setupDrawingBoard(svg, bar) {
-  // Update SVG height
+  // Update SVG size
   const updateSvgSize = () => {
+    svg.style.width = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth) + 'px';
     svg.style.height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 'px';
   };
   window.addEventListener('resize', updateSvgSize);
   new MutationObserver(updateSvgSize).observe(document.body, { childList: true, subtree: true });
   updateSvgSize();
+  svg.style.background = 'rgba(0,0,0,0.001)'; // Invisible but catches pointer events
 
   // Toolbar events
   bar.querySelectorAll('.db-tool').forEach(btn => {
