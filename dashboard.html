@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebNote Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <div class="logo">
+        <img src="icons/icon48.png">
+        <h1>WebNote</h1>
+      </div>
+      <nav>
+        <button class="nav-btn active" data-tab="all-notes">All Notes</button>
+        <button class="nav-btn" data-tab="url-rules">URL Rules</button>
+        <button class="nav-btn" data-tab="settings">Settings</button>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <section id="all-notes" class="tab-content active">
+        <div class="header-row">
+          <h2>Your Notes</h2>
+          <div class="actions">
+            <input type="text" id="search-notes" placeholder="Search notes...">
+            <button id="export-btn" class="btn btn-secondary">Export JSON</button>
+            <button id="import-trigger" class="btn btn-secondary">Import JSON</button>
+            <input type="file" id="import-file" style="display:none">
+          </div>
+        </div>
+        <div id="notes-grid" class="notes-grid">
+          <!-- Notes cards here -->
+        </div>
+      </section>
+
+      <section id="url-rules" class="tab-content">
+        <h2>URL Rules</h2>
+        <p>Control where WebNote appears. You can exclude specific domains or subpages.</p>
+        <div class="rule-input">
+          <input type="text" id="new-rule" placeholder="e.g. google.com or /search">
+          <button id="add-rule" class="btn btn-primary">Add Exclusion</button>
+        </div>
+        <ul id="rules-list" class="rules-list">
+          <!-- Rules here -->
+        </ul>
+      </section>
+
+      <section id="settings" class="tab-content">
+        <h2>Settings</h2>
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Cloud Sync</h3>
+            <p>Synchronize notes across your Chrome devices (limited to 100KB total).</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="sync-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 250px;
+      padding: 16px;
+      font-family: 'Inter', system-ui, sans-serif;
+      margin: 0;
+      background: #f9fafb;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .header img {
+      width: 24px;
+      height: 24px;
+    }
+    .header h2 {
+      margin: 0;
+      font-size: 16px;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .version-badge {
+      font-size: 10px;
+      background: #eef2ff;
+      color: #6366f1;
+      padding: 2px 6px;
+      border-radius: 100px;
+      font-weight: 500;
+    }
+    .stats {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      margin-bottom: 16px;
+    }
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #4b5563;
+    }
+    .stat-val {
+      font-weight: 600;
+      color: #6366f1;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: block;
+      text-align: center;
+      text-decoration: none;
+      margin-bottom: 8px;
+    }
+    .btn-primary {
+      background: #6366f1;
+      color: white;
+    }
+    .btn-secondary {
+      background: white;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="icons/icon48.png">
+    <h2>WebNote <span id="version" class="version-badge">v1.0.0</span></h2>
+  </div>
+  <div class="stats">
+    <div class="stat-item">
+      <span>Notes on this page:</span>
+      <span id="page-count" class="stat-val">0</span>
+    </div>
+    <div class="stat-item" style="margin-top: 8px;">
+      <span>Total notes:</span>
+      <span id="total-count" class="stat-val">0</span>
+    </div>
+  </div>
+  <button id="add-note" class="btn btn-primary">Add Note to Page</button>
+  <button id="open-dashboard" class="btn btn-secondary">Open Dashboard</button>
+  <script src="popup.js"></script>
+</body>
+</html>
