@@ -161,8 +161,7 @@ function injectUI() {
       </div>
       <div class="db-sep"></div>
       <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
-      <div class="db-sep"></div>
-      <button class="db-tool db-btn-min" title="Minimieren">🔽</button>
+      <button class="db-tool db-btn-min" title="Minimieren">${toolbarState.vert ? '🔽' : '◀️'}</button>
     </div>
   `;
   shadow.appendChild(drawBar);
@@ -941,6 +940,7 @@ function setupDrawingBoard(svg, bar) {
     toolbarState.vert = !toolbarState.vert;
     e.target.textContent = toolbarState.vert ? '↔️' : '↕️';
     bar.classList.toggle('vertical', toolbarState.vert);
+    bar.querySelector('.db-btn-min').textContent = toolbarState.vert ? '🔽' : '◀️';
     chrome.storage.local.set({ toolbarState });
   };
   bar.querySelector('.db-btn-list').onclick = () => toggleSidebar();
