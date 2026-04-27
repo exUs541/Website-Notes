@@ -574,7 +574,11 @@ document.addEventListener('contextmenu', e => {
 function addHighlight(text) {
   if (!text) return;
   const id = Date.now().toString();
-  const hl = { id, url: location.href, text, color: activeHlColor };
+  // Use toolbar color, add opacity (e.g. 50% = 80 in hex) so text is readable
+  let color = activeColor;
+  if (color.length === 7) color += '80'; 
+  
+  const hl = { id, url: location.href, text, color };
   highlights.push(hl);
   saveHighlights();
 
@@ -936,6 +940,16 @@ function setupDrawingBoard(svg, bar) {
   let pathData = '';
 
   svg.addEventListener('mousedown', e => {
+    if (activeTool === 'eraser') {
+      svg.style.pointerEvents = 'none';
+      const elUnder = document.elementFromPoint(e.clientX, e.clientY);
+      svg.style.pointerEvents = 'all';
+      if (elUnder && elUnder.classList.contains('webnote-hl')) {
+        removeHighlight(elUnder.dataset.wn);
+      }
+      return;
+    }
+    
     if (!['draw','rect','ellipse'].includes(activeTool)) return;
     isDrawing = true;
     startX = e.pageX;
