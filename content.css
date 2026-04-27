@@ -169,9 +169,28 @@
 .webnote-drawbar {
   position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
   background: white; border: 1px solid #e2e8f0; border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; align-items: center; padding: 6px;
-  gap: 4px; z-index: 2147483647;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px;
+  z-index: 2147483647; transition: all 0.2s ease;
 }
+.webnote-drawbar.vertical {
+  flex-direction: column; top: 50%; left: 20px; transform: translateY(-50%);
+}
+.db-full { display: flex; align-items: center; gap: 4px; }
+.webnote-drawbar.vertical .db-full { flex-direction: column; }
+.db-min-icon {
+  display: none; font-size: 20px; width: 36px; height: 36px; cursor: pointer;
+  align-items: center; justify-content: center;
+}
+.webnote-drawbar.minimized .db-full { display: none; }
+.webnote-drawbar.minimized .db-min-icon { display: flex; }
+.webnote-drawbar.minimized { border-radius: 50%; width: 48px; height: 48px; padding: 0; justify-content: center; align-items: center; }
+
+.db-drag-handle {
+  cursor: grab; padding: 0 4px; color: #cbd5e1; display: flex; align-items: center; justify-content: center;
+  user-select: none; font-weight: bold; font-size: 14px; letter-spacing: -2px;
+}
+.webnote-drawbar.vertical .db-drag-handle { transform: rotate(90deg); padding: 4px 0; }
+
 .db-tool {
   background: transparent; border: none; font-size: 18px; width: 32px; height: 32px;
   border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -180,7 +199,9 @@
 .db-tool:hover { background: #f1f5f9; }
 .db-tool.active { background: #eef2ff; border: 1px solid #c7d2fe; box-sizing: border-box; }
 .db-sep { width: 1px; height: 24px; background: #e2e8f0; margin: 0 4px; }
+.webnote-drawbar.vertical .db-sep { width: 24px; height: 1px; margin: 4px 0; }
 .db-colors { display: flex; gap: 4px; padding: 0 4px; }
+.webnote-drawbar.vertical .db-colors { flex-direction: column; padding: 4px 0; }
 .db-color { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-sizing: border-box; }
 .db-color:hover { transform: scale(1.1); }
 

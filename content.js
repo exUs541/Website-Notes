@@ -12,6 +12,7 @@ let sidebarGroup = 'none';
 let drawings   = [];
 let activeTool = 'cursor'; // cursor, highlight, draw, rect, ellipse
 let activeColor = '#ef4444'; // default red
+let toolbarState = { x: null, y: 20, min: false, vert: false };
 
 const NOTE_COLORS = [
   { v: null,      bg: '#ffffff', label: 'Standard' },
@@ -61,13 +62,14 @@ function migrateNote(note) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const data = await chrome.storage.local.get(['notes','highlights','rules','sidebarSort','sidebarGroup','drawings']);
+    const data = await chrome.storage.local.get(['notes','highlights','rules','sidebarSort','sidebarGroup','drawings','toolbarState']);
     notes      = (data.notes || []).map(migrateNote);
     highlights = data.highlights || [];
     rules      = data.rules      || { hiddenUrls: [] };
     sidebarSort  = data.sidebarSort  || 'date-desc';
     sidebarGroup = data.sidebarGroup || 'none';
     drawings   = data.drawings || [];
+    toolbarState = data.toolbarState || { x: null, y: 20, min: false, vert: false };
     injectUI();
     renderPageNotes();
     restoreHighlights();
@@ -124,36 +126,45 @@ function injectUI() {
 
   // Drawing Toolbar
   const drawBar = document.createElement('div');
-  drawBar.className = 'webnote-drawbar';
+  drawBar.id = 'webnote-drawbar';
+  drawBar.className = `webnote-drawbar ${toolbarState.vert ? 'vertical' : ''} ${toolbarState.min ? 'minimized' : ''}`;
   drawBar.style.pointerEvents = 'all';
+  if (toolbarState.x !== null && toolbarState.y !== null) {
+    drawBar.style.left = `${toolbarState.x}px`;
+    drawBar.style.top = `${toolbarState.y}px`;
+    drawBar.style.transform = 'none';
+  }
+
   drawBar.innerHTML = `
-    <button class="db-tool active" data-tool="cursor" title="Maus (Normal)">🖱️</button>
-    <div class="db-sep"></div>
-    <button class="db-tool" data-tool="highlight" title="Text markieren">🖊️</button>
-    <div class="db-sep"></div>
-    <button class="db-tool" data-tool="draw" title="Freihand zeichnen">🖌️</button>
-    <button class="db-tool" data-tool="rect" title="Rechteck">⬜</button>
-    <button class="db-tool" data-tool="ellipse" title="Kreis">⭕</button>
-    <div class="db-sep"></div>
-    <div class="db-colors">
-      <div class="db-color" data-c="#ef4444" style="background:#ef4444; border: 2px solid #1e293b;"></div>
-      <div class="db-color" data-c="#3b82f6" style="background:#3b82f6;"></div>
-      <div class="db-color" data-c="#22c55e" style="background:#22c55e;"></div>
-      <div class="db-color" data-c="#eab308" style="background:#eab308;"></div>
-      <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
+    <div class="db-min-icon" title="WebNote öffnen">📝</div>
+    <div class="db-full">
+      <div class="db-drag-handle" title="Verschieben">⋮⋮</div>
+      <button class="db-tool db-toggle-dir" title="Ausrichtung ändern">${toolbarState.vert ? '↔️' : '↕️'}</button>
+      <div class="db-sep"></div>
+      <button class="db-tool db-btn-list" title="Alle Notizen (Sidebar)">📋</button>
+      <button class="db-tool db-btn-new" title="Neue Notiz">➕</button>
+      <div class="db-sep"></div>
+      <button class="db-tool active" data-tool="cursor" title="Maus (Normal)">🖱️</button>
+      <button class="db-tool" data-tool="highlight" title="Text markieren">🖊️</button>
+      <div class="db-sep"></div>
+      <button class="db-tool" data-tool="draw" title="Freihand zeichnen">🖌️</button>
+      <button class="db-tool" data-tool="rect" title="Rechteck">⬜</button>
+      <button class="db-tool" data-tool="ellipse" title="Kreis">⭕</button>
+      <div class="db-sep"></div>
+      <div class="db-colors">
+        <div class="db-color" data-c="#ef4444" style="background:#ef4444; border: 2px solid #1e293b;"></div>
+        <div class="db-color" data-c="#3b82f6" style="background:#3b82f6;"></div>
+        <div class="db-color" data-c="#22c55e" style="background:#22c55e;"></div>
+        <div class="db-color" data-c="#eab308" style="background:#eab308;"></div>
+        <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
+      </div>
+      <div class="db-sep"></div>
+      <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
+      <div class="db-sep"></div>
+      <button class="db-tool db-btn-min" title="Minimieren">—</button>
     </div>
-    <div class="db-sep"></div>
-    <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
   `;
   shadow.appendChild(drawBar);
-
-  // FAB
-  const fab = document.createElement('div');
-  fab.className = 'webnote-fab';
-  fab.innerHTML = '📝';
-  fab.style.pointerEvents = 'all';
-  fab.onclick = toggleSidebar;
-  shadow.appendChild(fab);
 
   // Sidebar
   const sb = document.createElement('div');
@@ -897,9 +908,10 @@ function setupDrawingBoard(svg, bar) {
   svg.style.background = 'rgba(0,0,0,0.001)'; // Invisible but catches pointer events
 
   // Toolbar events
-  bar.querySelectorAll('.db-tool').forEach(btn => {
+  const tools = bar.querySelectorAll('.db-tool[data-tool]');
+  tools.forEach(btn => {
     btn.onclick = () => {
-      bar.querySelectorAll('.db-tool').forEach(b => b.classList.remove('active'));
+      tools.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTool = btn.dataset.tool;
       svg.style.pointerEvents = ['draw','rect','ellipse','eraser'].includes(activeTool) ? 'all' : 'none';
@@ -908,6 +920,52 @@ function setupDrawingBoard(svg, bar) {
       else svg.style.cursor = 'default';
     };
   });
+
+  // Action Buttons
+  bar.querySelector('.db-min-icon').onclick = () => {
+    toolbarState.min = false;
+    bar.classList.remove('minimized');
+    chrome.storage.local.set({ toolbarState });
+  };
+  bar.querySelector('.db-btn-min').onclick = () => {
+    toolbarState.min = true;
+    bar.classList.add('minimized');
+    chrome.storage.local.set({ toolbarState });
+  };
+  bar.querySelector('.db-toggle-dir').onclick = (e) => {
+    toolbarState.vert = !toolbarState.vert;
+    e.target.textContent = toolbarState.vert ? '↔️' : '↕️';
+    bar.classList.toggle('vertical', toolbarState.vert);
+    chrome.storage.local.set({ toolbarState });
+  };
+  bar.querySelector('.db-btn-list').onclick = () => toggleSidebar();
+  bar.querySelector('.db-btn-new').onclick = () => createNote({ x: 60, y: 120 });
+
+  // Toolbar Drag Logic
+  const handle = bar.querySelector('.db-drag-handle');
+  const minIcon = bar.querySelector('.db-min-icon');
+  
+  const setupDrag = (dragEl) => {
+    let sX, sY, oL, oT;
+    dragEl.onmousedown = e => {
+      e.preventDefault();
+      sX = e.clientX; sY = e.clientY; 
+      oL = bar.offsetLeft; oT = bar.offsetTop;
+      const mv = me => {
+        const nx = oL + (me.clientX - sX), ny = oT + (me.clientY - sY);
+        bar.style.left = `${nx}px`; bar.style.top = `${ny}px`;
+        toolbarState.x = nx; toolbarState.y = ny;
+      };
+      const up = () => { 
+        chrome.storage.local.set({ toolbarState });
+        document.removeEventListener('mousemove', mv); 
+        document.removeEventListener('mouseup', up); 
+      };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+    };
+  };
+  setupDrag(handle);
+  setupDrag(minIcon); // allow dragging by the minimized icon too
 
   bar.querySelectorAll('.db-color').forEach(sw => {
     sw.onclick = () => {
