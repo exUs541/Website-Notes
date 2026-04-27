@@ -166,6 +166,24 @@
 }
 .webnote-sidebar.hidden { transform: translateX(100%); }
 
+.webnote-drawbar {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; align-items: center; padding: 6px;
+  gap: 4px; z-index: 2147483647;
+}
+.db-tool {
+  background: transparent; border: none; font-size: 18px; width: 32px; height: 32px;
+  border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.db-tool:hover { background: #f1f5f9; }
+.db-tool.active { background: #eef2ff; border: 1px solid #c7d2fe; box-sizing: border-box; }
+.db-sep { width: 1px; height: 24px; background: #e2e8f0; margin: 0 4px; }
+.db-colors { display: flex; gap: 4px; padding: 0 4px; }
+.db-color { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-sizing: border-box; }
+.db-color:hover { transform: scale(1.1); }
+
 .sb-header {
   padding: 16px; display: flex; justify-content: space-between; align-items: center;
   border-bottom: 1px solid #f1f5f9;

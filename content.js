@@ -9,6 +9,10 @@ let shadow     = null;
 let sidebarSort = 'date-desc';
 let sidebarGroup = 'none';
 
+let drawings   = [];
+let activeTool = 'cursor'; // cursor, highlight, draw, rect, ellipse
+let activeColor = '#ef4444'; // default red
+
 const NOTE_COLORS = [
   { v: null,      bg: '#ffffff', label: 'Standard' },
   { v: '#fef9c3', bg: '#fef9c3', label: 'Gelb' },
@@ -57,15 +61,17 @@ function migrateNote(note) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const data = await chrome.storage.local.get(['notes','highlights','rules']);
+    const data = await chrome.storage.local.get(['notes','highlights','rules','sidebarSort','sidebarGroup','drawings']);
     notes      = (data.notes || []).map(migrateNote);
     highlights = data.highlights || [];
     rules      = data.rules      || { hiddenUrls: [] };
     sidebarSort  = data.sidebarSort  || 'date-desc';
     sidebarGroup = data.sidebarGroup || 'none';
+    drawings   = data.drawings || [];
     injectUI();
     renderPageNotes();
     restoreHighlights();
+    renderDrawings();
     updateBadge();
     window.addEventListener('scroll', updatePinnedPositions, { passive: true });
     console.log(`[WebNote] v${chrome.runtime.getManifest().version} ready`);
@@ -104,6 +110,38 @@ function injectUI() {
   link.rel = 'stylesheet';
   link.href = chrome.runtime.getURL('content.css');
   shadow.appendChild(link);
+
+  // SVG Drawing Overlay
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svgOverlay = document.createElementNS(svgNS, "svg");
+  svgOverlay.id = 'webnote-drawing-board';
+  svgOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2147483646;';
+  shadow.appendChild(svgOverlay);
+
+  // Drawing Toolbar
+  const drawBar = document.createElement('div');
+  drawBar.className = 'webnote-drawbar';
+  drawBar.style.pointerEvents = 'all';
+  drawBar.innerHTML = `
+    <button class="db-tool active" data-tool="cursor" title="Maus (Normal)">🖱️</button>
+    <div class="db-sep"></div>
+    <button class="db-tool" data-tool="highlight" title="Text markieren">🖊️</button>
+    <div class="db-sep"></div>
+    <button class="db-tool" data-tool="draw" title="Freihand zeichnen">🖌️</button>
+    <button class="db-tool" data-tool="rect" title="Rechteck">⬜</button>
+    <button class="db-tool" data-tool="ellipse" title="Kreis">⭕</button>
+    <div class="db-sep"></div>
+    <div class="db-colors">
+      <div class="db-color" data-c="#ef4444" style="background:#ef4444; border: 2px solid #1e293b;"></div>
+      <div class="db-color" data-c="#3b82f6" style="background:#3b82f6;"></div>
+      <div class="db-color" data-c="#22c55e" style="background:#22c55e;"></div>
+      <div class="db-color" data-c="#eab308" style="background:#eab308;"></div>
+      <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
+    </div>
+    <div class="db-sep"></div>
+    <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
+  `;
+  shadow.appendChild(drawBar);
 
   // FAB
   const fab = document.createElement('div');
@@ -159,6 +197,8 @@ function injectUI() {
   sb.querySelector('.sb-search').oninput   = (e) => updateSidebarList(e.target.value);
   sb.querySelector('.sb-sort-sel').onchange = (e) => { sidebarSort = e.target.value; saveNotes(); updateSidebarList(sb.querySelector('.sb-search').value); };
   sb.querySelector('.sb-group-sel').onchange = (e) => { sidebarGroup = e.target.value; saveNotes(); updateSidebarList(sb.querySelector('.sb-search').value); };
+
+  setupDrawingBoard(svgOverlay, drawBar);
 }
 
 // ── Note Creation ─────────────────────────────────────────────────────────────
@@ -797,6 +837,171 @@ function selector(el) {
   return path.join(' > ');
 }
 
+// ── Drawing Board ─────────────────────────────────────────────────────────────
+function saveDrawings() { chrome.storage.local.set({ drawings }); }
+
+function renderDrawings() {
+  const svg = shadow.querySelector('#webnote-drawing-board');
+  if (!svg) return;
+  svg.innerHTML = '';
+  const cur = normUrl(location.href);
+  drawings.filter(d => normUrl(d.url) === cur).forEach(d => {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", d.type);
+    el.setAttribute('stroke', d.color);
+    el.setAttribute('stroke-width', '4');
+    el.setAttribute('fill', d.type === 'path' ? 'none' : 'transparent');
+    el.dataset.id = d.id;
+    if (d.type === 'path') {
+      el.setAttribute('stroke-linecap', 'round');
+      el.setAttribute('stroke-linejoin', 'round');
+      el.setAttribute('d', d.data);
+    } else if (d.type === 'rect') {
+      el.setAttribute('x', d.x); el.setAttribute('y', d.y);
+      el.setAttribute('width', d.w); el.setAttribute('height', d.h);
+    } else if (d.type === 'ellipse') {
+      el.setAttribute('cx', d.cx); el.setAttribute('cy', d.cy);
+      el.setAttribute('rx', d.rx); el.setAttribute('ry', d.ry);
+    }
+    
+    // Eraser interaction
+    el.addEventListener('mousedown', (e) => {
+      if (activeTool === 'eraser') {
+        e.stopPropagation();
+        drawings = drawings.filter(x => x.id !== d.id);
+        saveDrawings();
+        el.remove();
+      }
+    });
+    
+    svg.appendChild(el);
+  });
+}
+
+function setupDrawingBoard(svg, bar) {
+  // Update SVG height
+  const updateSvgSize = () => {
+    svg.style.height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 'px';
+  };
+  window.addEventListener('resize', updateSvgSize);
+  new MutationObserver(updateSvgSize).observe(document.body, { childList: true, subtree: true });
+  updateSvgSize();
+
+  // Toolbar events
+  bar.querySelectorAll('.db-tool').forEach(btn => {
+    btn.onclick = () => {
+      bar.querySelectorAll('.db-tool').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTool = btn.dataset.tool;
+      svg.style.pointerEvents = ['draw','rect','ellipse','eraser'].includes(activeTool) ? 'all' : 'none';
+      if (activeTool === 'eraser') svg.style.cursor = 'crosshair';
+      else if (activeTool !== 'cursor' && activeTool !== 'highlight') svg.style.cursor = 'crosshair';
+      else svg.style.cursor = 'default';
+    };
+  });
+
+  bar.querySelectorAll('.db-color').forEach(sw => {
+    sw.onclick = () => {
+      bar.querySelectorAll('.db-color').forEach(s => s.style.border = 'none');
+      sw.style.border = '2px solid #1e293b';
+      activeColor = sw.dataset.c;
+      // Auto-switch to draw tool if a drawing tool isn't active
+      if (!['draw','rect','ellipse'].includes(activeTool)) {
+        bar.querySelector('[data-tool="draw"]').click();
+      }
+    };
+  });
+
+  // Highlighting Mode: listen on document for selection
+  document.addEventListener('mouseup', () => {
+    if (activeTool === 'highlight') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        lastPageRange = sel.getRangeAt(0).cloneRange();
+        addHighlight(sel.toString());
+        sel.removeAllRanges();
+      }
+    }
+  });
+
+  // Drawing logic
+  let isDrawing = false;
+  let currentShape = null;
+  let startX = 0, startY = 0;
+  let pathData = '';
+
+  svg.addEventListener('mousedown', e => {
+    if (!['draw','rect','ellipse'].includes(activeTool)) return;
+    isDrawing = true;
+    startX = e.pageX;
+    startY = e.pageY;
+
+    currentShape = document.createElementNS("http://www.w3.org/2000/svg", activeTool === 'draw' ? 'path' : activeTool);
+    currentShape.setAttribute('stroke', activeColor);
+    currentShape.setAttribute('stroke-width', '4');
+    currentShape.setAttribute('fill', activeTool === 'draw' ? 'none' : 'transparent');
+    
+    if (activeTool === 'draw') {
+      currentShape.setAttribute('stroke-linecap', 'round');
+      currentShape.setAttribute('stroke-linejoin', 'round');
+      pathData = `M ${startX} ${startY}`;
+      currentShape.setAttribute('d', pathData);
+    }
+    svg.appendChild(currentShape);
+  });
+
+  svg.addEventListener('mousemove', e => {
+    if (!isDrawing || !currentShape) return;
+    const cx = e.pageX;
+    const cy = e.pageY;
+    
+    if (activeTool === 'draw') {
+      pathData += ` L ${cx} ${cy}`;
+      currentShape.setAttribute('d', pathData);
+    } else if (activeTool === 'rect') {
+      const x = Math.min(startX, cx);
+      const y = Math.min(startY, cy);
+      const w = Math.abs(cx - startX);
+      const h = Math.abs(cy - startY);
+      currentShape.setAttribute('x', x); currentShape.setAttribute('y', y);
+      currentShape.setAttribute('width', w); currentShape.setAttribute('height', h);
+    } else if (activeTool === 'ellipse') {
+      const rx = Math.abs(cx - startX) / 2;
+      const ry = Math.abs(cy - startY) / 2;
+      const cx_center = Math.min(startX, cx) + rx;
+      const cy_center = Math.min(startY, cy) + ry;
+      currentShape.setAttribute('cx', cx_center); currentShape.setAttribute('cy', cy_center);
+      currentShape.setAttribute('rx', rx); currentShape.setAttribute('ry', ry);
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDrawing) return;
+    isDrawing = false;
+    if (!currentShape) return;
+    
+    const d = { id: Date.now().toString(), url: location.href, color: activeColor, type: activeTool === 'draw' ? 'path' : activeTool };
+    
+    if (activeTool === 'draw') {
+      if (!pathData.includes('L')) { currentShape.remove(); return; } // just a dot
+      d.data = pathData;
+    } else if (activeTool === 'rect') {
+      d.x = currentShape.getAttribute('x'); d.y = currentShape.getAttribute('y');
+      d.w = currentShape.getAttribute('width'); d.h = currentShape.getAttribute('height');
+      if (d.w < 5 && d.h < 5) { currentShape.remove(); return; }
+    } else if (activeTool === 'ellipse') {
+      d.cx = currentShape.getAttribute('cx'); d.cy = currentShape.getAttribute('cy');
+      d.rx = currentShape.getAttribute('rx'); d.ry = currentShape.getAttribute('ry');
+      if (d.rx < 5 && d.ry < 5) { currentShape.remove(); return; }
+    }
+    
+    currentShape.remove(); // let renderDrawings re-add it with events
+    drawings.push(d);
+    saveDrawings();
+    renderDrawings();
+    currentShape = null;
+  });
+}
+
 // ── Messages ──────────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   if (msg.action === 'ADD_NOTE') {
@@ -819,7 +1024,7 @@ setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     if (shadow) shadow.querySelectorAll('.webnote-sticky').forEach(n => n.remove());
-    renderPageNotes(); restoreHighlights(); updateBadge();
+    renderPageNotes(); restoreHighlights(); renderDrawings(); updateBadge();
   }
 }, 1000);
 
