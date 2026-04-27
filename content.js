@@ -150,6 +150,7 @@ function injectUI() {
       <button class="db-tool" data-tool="draw" title="Freihand zeichnen">🖌️</button>
       <button class="db-tool" data-tool="rect" title="Rechteck">⬜</button>
       <button class="db-tool" data-tool="ellipse" title="Kreis">⭕</button>
+      <button class="db-tool" data-tool="line" title="Linie">📏</button>
       <div class="db-sep"></div>
       <div class="db-colors">
         <div class="db-color" data-c="#ef4444" style="background:#ef4444; border: 2px solid #1e293b;"></div>
@@ -161,7 +162,7 @@ function injectUI() {
       <div class="db-sep"></div>
       <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-min" title="Minimieren">—</button>
+      <button class="db-tool db-btn-min" title="Minimieren">🔽</button>
     </div>
   `;
   shadow.appendChild(drawBar);
@@ -880,6 +881,10 @@ function renderDrawings() {
     } else if (d.type === 'ellipse') {
       el.setAttribute('cx', d.cx); el.setAttribute('cy', d.cy);
       el.setAttribute('rx', d.rx); el.setAttribute('ry', d.ry);
+    } else if (d.type === 'line') {
+      el.setAttribute('stroke-linecap', 'round');
+      el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
+      el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
     }
     
     // Eraser interaction
@@ -1004,7 +1009,7 @@ function setupDrawingBoard(svg, bar) {
       return;
     }
     
-    if (!['draw','rect','ellipse'].includes(activeTool)) return;
+    if (!['draw','rect','ellipse','line'].includes(activeTool)) return;
     isDrawing = true;
     startX = e.pageX;
     startY = e.pageY;
@@ -1019,6 +1024,12 @@ function setupDrawingBoard(svg, bar) {
       currentShape.setAttribute('stroke-linejoin', 'round');
       pathData = `M ${startX} ${startY}`;
       currentShape.setAttribute('d', pathData);
+    } else if (activeTool === 'line') {
+      currentShape.setAttribute('stroke-linecap', 'round');
+      currentShape.setAttribute('x1', startX);
+      currentShape.setAttribute('y1', startY);
+      currentShape.setAttribute('x2', startX);
+      currentShape.setAttribute('y2', startY);
     }
     svg.appendChild(currentShape);
   });
@@ -1045,6 +1056,9 @@ function setupDrawingBoard(svg, bar) {
       const cy_center = Math.min(startY, cy) + ry;
       currentShape.setAttribute('cx', cx_center); currentShape.setAttribute('cy', cy_center);
       currentShape.setAttribute('rx', rx); currentShape.setAttribute('ry', ry);
+    } else if (activeTool === 'line') {
+      currentShape.setAttribute('x2', cx);
+      currentShape.setAttribute('y2', cy);
     }
   });
 
@@ -1066,6 +1080,11 @@ function setupDrawingBoard(svg, bar) {
       d.cx = currentShape.getAttribute('cx'); d.cy = currentShape.getAttribute('cy');
       d.rx = currentShape.getAttribute('rx'); d.ry = currentShape.getAttribute('ry');
       if (d.rx < 5 && d.ry < 5) { currentShape.remove(); return; }
+    } else if (activeTool === 'line') {
+      d.x1 = currentShape.getAttribute('x1'); d.y1 = currentShape.getAttribute('y1');
+      d.x2 = currentShape.getAttribute('x2'); d.y2 = currentShape.getAttribute('y2');
+      const dist = Math.hypot(d.x2 - d.x1, d.y2 - d.y1);
+      if (dist < 5) { currentShape.remove(); return; }
     }
     
     currentShape.remove(); // let renderDrawings re-add it with events
