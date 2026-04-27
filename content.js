@@ -914,10 +914,6 @@ function setupDrawingBoard(svg, bar) {
       bar.querySelectorAll('.db-color').forEach(s => s.style.border = 'none');
       sw.style.border = '2px solid #1e293b';
       activeColor = sw.dataset.c;
-      // Auto-switch to draw tool if a drawing tool isn't active
-      if (!['draw','rect','ellipse'].includes(activeTool)) {
-        bar.querySelector('[data-tool="draw"]').click();
-      }
     };
   });
 
