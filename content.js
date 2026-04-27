@@ -1014,22 +1014,17 @@ function setupDrawingBoard(svg, bar) {
     startX = e.pageX;
     startY = e.pageY;
 
-    currentShape = document.createElementNS("http://www.w3.org/2000/svg", activeTool === 'draw' ? 'path' : activeTool);
+    currentShape = document.createElementNS("http://www.w3.org/2000/svg", (activeTool === 'draw' || activeTool === 'line') ? 'path' : activeTool);
     currentShape.setAttribute('stroke', activeColor);
     currentShape.setAttribute('stroke-width', '4');
-    currentShape.setAttribute('fill', activeTool === 'draw' ? 'none' : 'transparent');
+    currentShape.setAttribute('fill', (activeTool === 'draw' || activeTool === 'line') ? 'none' : 'transparent');
     
-    if (activeTool === 'draw') {
+    if (activeTool === 'draw' || activeTool === 'line') {
       currentShape.setAttribute('stroke-linecap', 'round');
       currentShape.setAttribute('stroke-linejoin', 'round');
       pathData = `M ${startX} ${startY}`;
+      if (activeTool === 'line') pathData += ` L ${startX} ${startY}`;
       currentShape.setAttribute('d', pathData);
-    } else if (activeTool === 'line') {
-      currentShape.setAttribute('stroke-linecap', 'round');
-      currentShape.setAttribute('x1', startX);
-      currentShape.setAttribute('y1', startY);
-      currentShape.setAttribute('x2', startX);
-      currentShape.setAttribute('y2', startY);
     }
     svg.appendChild(currentShape);
   });
@@ -1041,6 +1036,9 @@ function setupDrawingBoard(svg, bar) {
     
     if (activeTool === 'draw') {
       pathData += ` L ${cx} ${cy}`;
+      currentShape.setAttribute('d', pathData);
+    } else if (activeTool === 'line') {
+      pathData = `M ${startX} ${startY} L ${cx} ${cy}`;
       currentShape.setAttribute('d', pathData);
     } else if (activeTool === 'rect') {
       const x = Math.min(startX, cx);
@@ -1056,9 +1054,6 @@ function setupDrawingBoard(svg, bar) {
       const cy_center = Math.min(startY, cy) + ry;
       currentShape.setAttribute('cx', cx_center); currentShape.setAttribute('cy', cy_center);
       currentShape.setAttribute('rx', rx); currentShape.setAttribute('ry', ry);
-    } else if (activeTool === 'line') {
-      currentShape.setAttribute('x2', cx);
-      currentShape.setAttribute('y2', cy);
     }
   });
 
@@ -1081,10 +1076,9 @@ function setupDrawingBoard(svg, bar) {
       d.rx = currentShape.getAttribute('rx'); d.ry = currentShape.getAttribute('ry');
       if (d.rx < 5 && d.ry < 5) { currentShape.remove(); return; }
     } else if (activeTool === 'line') {
-      d.x1 = currentShape.getAttribute('x1'); d.y1 = currentShape.getAttribute('y1');
-      d.x2 = currentShape.getAttribute('x2'); d.y2 = currentShape.getAttribute('y2');
-      const dist = Math.hypot(d.x2 - d.x1, d.y2 - d.y1);
-      if (dist < 5) { currentShape.remove(); return; }
+      d.type = 'path';
+      d.data = pathData;
+      if (!pathData.includes('L') || pathData.split(' L ')[0] === 'M ' + pathData.split(' L ')[1]) { currentShape.remove(); return; }
     }
     
     currentShape.remove(); // let renderDrawings re-add it with events
