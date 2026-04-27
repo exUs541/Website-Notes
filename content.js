@@ -14,6 +14,35 @@ let activeTool = 'cursor'; // cursor, highlight, draw, rect, ellipse
 let activeColor = '#ef4444'; // default red
 let toolbarState = { x: null, y: 20, min: false, vert: false };
 
+let undoStack = [];
+let redoStack = [];
+
+function saveDrawingSnapshot() {
+  const cur = normUrl(location.href);
+  undoStack.push(JSON.stringify(drawings.filter(d => normUrl(d.url) === cur)));
+  redoStack = [];
+}
+
+function performUndo() {
+  if (undoStack.length === 0) return;
+  const cur = normUrl(location.href);
+  redoStack.push(JSON.stringify(drawings.filter(d => normUrl(d.url) === cur)));
+  const prevState = JSON.parse(undoStack.pop());
+  drawings = drawings.filter(d => normUrl(d.url) !== cur).concat(prevState);
+  saveDrawings();
+  renderDrawings();
+}
+
+function performRedo() {
+  if (redoStack.length === 0) return;
+  const cur = normUrl(location.href);
+  undoStack.push(JSON.stringify(drawings.filter(d => normUrl(d.url) === cur)));
+  const nextState = JSON.parse(redoStack.pop());
+  drawings = drawings.filter(d => normUrl(d.url) !== cur).concat(nextState);
+  saveDrawings();
+  renderDrawings();
+}
+
 const NOTE_COLORS = [
   { v: null,      bg: '#ffffff', label: 'Standard' },
   { v: '#fef9c3', bg: '#fef9c3', label: 'Gelb' },
@@ -159,6 +188,9 @@ function injectUI() {
         <div class="db-color" data-c="#eab308" style="background:#eab308;"></div>
         <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
       </div>
+      <div class="db-sep"></div>
+      <button class="db-tool db-btn-undo" title="Rückgängig (Undo)">↩️</button>
+      <button class="db-tool db-btn-redo" title="Wiederherstellen (Redo)">↪️</button>
       <div class="db-sep"></div>
       <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
       <button class="db-tool db-btn-min" title="Minimieren">${toolbarState.vert ? '🔼' : '◀️'}</button>
@@ -890,6 +922,7 @@ function renderDrawings() {
     el.addEventListener('mousedown', (e) => {
       if (activeTool === 'eraser') {
         e.stopPropagation();
+        saveDrawingSnapshot();
         drawings = drawings.filter(x => x.id !== d.id);
         saveDrawings();
         el.remove();
@@ -945,6 +978,8 @@ function setupDrawingBoard(svg, bar) {
   };
   bar.querySelector('.db-btn-list').onclick = () => toggleSidebar();
   bar.querySelector('.db-btn-new').onclick = () => createNote({ x: 60, y: 120 });
+  bar.querySelector('.db-btn-undo').onclick = performUndo;
+  bar.querySelector('.db-btn-redo').onclick = performRedo;
 
   // Toolbar Drag Logic
   const handle = bar.querySelector('.db-drag-handle');
@@ -1082,6 +1117,7 @@ function setupDrawingBoard(svg, bar) {
     }
     
     currentShape.remove(); // let renderDrawings re-add it with events
+    saveDrawingSnapshot();
     drawings.push(d);
     saveDrawings();
     renderDrawings();
