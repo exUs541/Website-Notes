@@ -170,7 +170,7 @@
   position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
   background: white; border: 1px solid #e2e8f0; border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px;
-  z-index: 2147483647; transition: all 0.2s ease;
+  z-index: 2147483647;
 }
 .webnote-drawbar.vertical {
   flex-direction: column; top: 50%; left: 20px; transform: translateY(-50%);
