@@ -12,7 +12,7 @@ let sidebarGroup = 'none';
 let drawings   = [];
 let activeTool = 'cursor'; // cursor, highlight, draw, rect, ellipse
 let activeColor = '#ef4444'; // default red
-let toolbarState = { x: null, y: 20, min: false, vert: false };
+let toolbarState = { x: null, y: 20, min: false, vert: false, hidden: false };
 
 let undoStack = [];
 let redoStack = [];
@@ -98,7 +98,7 @@ async function init() {
     sidebarSort  = data.sidebarSort  || 'date-desc';
     sidebarGroup = data.sidebarGroup || 'none';
     drawings   = data.drawings || [];
-    toolbarState = data.toolbarState || { x: null, y: 20, min: false, vert: false };
+    toolbarState = data.toolbarState || { x: null, y: 20, min: false, vert: false, hidden: false };
     injectUI();
     renderPageNotes();
     restoreHighlights();
@@ -163,6 +163,9 @@ function injectUI() {
     drawBar.style.top = `${toolbarState.y}px`;
     drawBar.style.transform = 'none';
   }
+  if (toolbarState.hidden) {
+    drawBar.style.display = 'none';
+  }
 
   drawBar.innerHTML = `
     <div class="db-min-icon" title="WebNote öffnen">📝</div>
@@ -194,6 +197,7 @@ function injectUI() {
       <div class="db-sep"></div>
       <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
       <button class="db-tool db-btn-min" title="Minimieren">${toolbarState.vert ? '🔼' : '◀️'}</button>
+      <button class="db-tool db-btn-close" title="Toolbar komplett ausblenden">✖️</button>
     </div>
   `;
   shadow.appendChild(drawBar);
@@ -980,6 +984,11 @@ function setupDrawingBoard(svg, bar) {
   bar.querySelector('.db-btn-new').onclick = () => createNote({ x: 60, y: 120 });
   bar.querySelector('.db-btn-undo').onclick = performUndo;
   bar.querySelector('.db-btn-redo').onclick = performRedo;
+  bar.querySelector('.db-btn-close').onclick = () => {
+    toolbarState.hidden = true;
+    chrome.storage.local.set({ toolbarState });
+    bar.style.display = 'none';
+  };
 
   // Toolbar Drag Logic
   const handle = bar.querySelector('.db-drag-handle');
@@ -1137,6 +1146,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   }
   if (msg.action === 'ADD_HIGHLIGHT') {
     addHighlight(msg.text);
+  }
+  if (msg.action === 'TOGGLE_TOOLBAR') {
+    toolbarState.hidden = !toolbarState.hidden;
+    chrome.storage.local.set({ toolbarState });
+    const bar = shadow?.querySelector('#webnote-drawbar');
+    if (bar) bar.style.display = toolbarState.hidden ? 'none' : 'flex';
   }
   reply({ ok: true });
 });
