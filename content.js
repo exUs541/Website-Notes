@@ -708,6 +708,10 @@ function saveHighlights() { chrome.storage.local.set({ highlights }); }
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function toggleSidebar() {
   const sb = shadow.querySelector('#webnote-sidebar');
+  if (!sb.classList.contains('animated')) {
+    void sb.offsetWidth; // force reflow
+    sb.classList.add('animated');
+  }
   const h  = sb.classList.toggle('hidden');
   if (!h) updateSidebarList();
 }
