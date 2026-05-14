@@ -22,14 +22,22 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (msg) chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
 });
 
-// ── Badge ──────────────────────────────────────────────────────────────────
-chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg.action !== 'UPDATE_BADGE') return;
-  const tabId = sender.tab?.id;
-  if (!tabId) return;
-  const text = msg.count > 0 ? String(msg.count) : '';
-  chrome.action.setBadgeText({ text, tabId });
-  chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
+// ── Messages & Badge ────────────────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === 'UPDATE_BADGE') {
+    const tabId = sender.tab?.id;
+    if (!tabId) return;
+    const text = msg.count > 0 ? String(msg.count) : '';
+    chrome.action.setBadgeText({ text, tabId });
+    chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
+  }
+
+  if (msg.action === 'CAPTURE_VISIBLE') {
+    chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+      sendResponse({ dataUrl });
+    });
+    return true; // async
+  }
 });
 
 // Update badge when switching tabs

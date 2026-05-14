@@ -1,6 +1,46 @@
 // content.js - WebNote v3.1
 'use strict';
 
+const ICONS = {
+  drag: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>`,
+  vert: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m13 16 4 4 4-4"/><path d="M17 20V4"/></svg>`,
+  horiz: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3-4 4 4 4"/><path d="M4 7h16"/><path d="m16 13 4 4-4 4"/><path d="M20 17H4"/></svg>`,
+  list: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+  plus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  cursor: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>`,
+  pen: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`,
+  highlighter: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`,
+  brush: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 22 .71-7.12 6.13-6.13a3.5 3.5 0 0 0-4.95-4.95l-6.13 6.13L1 12Z"/><path d="m9 8 5 5"/></svg>`,
+  rect: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>`,
+  circle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`,
+  line: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 20-20"/></svg>`,
+  undo: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
+  redo: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
+  eraser: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.4 5.4c1 1 1 2.5 0 3.4L17 17"/><path d="m22 21H7"/><path d="m5 11 9 9"/></svg>`,
+  minimize: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 15 6 6m-6-6v4.8m0-4.8h4.8M9 9 3 3m6 6V4.2M9 9H4.2"/></svg>`,
+  left: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>`,
+  up: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>`,
+  close: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  pin: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>`,
+  pinned: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>`,
+  palette: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.7-.72 1.7-1.65 0-.44-.19-.84-.49-1.15-.3-.3-.49-.71-.49-1.2 0-.92.73-1.64 1.63-1.64h2.9c3.04 0 5.5-2.43 5.5-5.46C22 5.4 17.53 2 12 2z"/></svg>`,
+  duplicate: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
+  compact: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  expand: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>`,
+  trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
+  refresh: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>`,
+  tags: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`,
+  camera: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>`,
+  crop: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>`,
+  monitor: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+  target: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`,
+  clipboard: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>`,
+  download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+};
+
+// content.js - WebNote v3.1
+
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let notes      = [];
 let highlights = [];
@@ -12,6 +52,7 @@ let sidebarGroup = 'none';
 let drawings   = [];
 let activeTool = 'cursor'; // cursor, highlight, draw, rect, ellipse
 let activeColor = '#ef4444'; // default red
+let selectedDrawingId = null;
 let toolbarState = { x: null, y: 20, min: false, vert: false, hidden: false };
 
 let undoStack = [];
@@ -137,7 +178,7 @@ function injectUI() {
 
   const host = document.createElement('div');
   host.id = 'webnote-shadow-host';
-  host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;z-index:2147483647;pointer-events:none;';
+  host.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;pointer-events:none;';
   document.body.appendChild(host);
   shadow = host.attachShadow({ mode: 'open' });
 
@@ -168,36 +209,39 @@ function injectUI() {
   }
 
   drawBar.innerHTML = `
-    <div class="db-min-icon" title="WebNote öffnen">📝</div>
+    <div class="db-min-icon" title="WebNote öffnen">${ICONS.highlighter}</div>
     <div class="db-full">
-      <div class="db-drag-handle" title="Verschieben">⋮⋮</div>
-      <button class="db-tool db-toggle-dir" title="Ausrichtung ändern">${toolbarState.vert ? '↔️' : '↕️'}</button>
+      <div class="db-drag-handle" title="Verschieben">${ICONS.drag}</div>
+      <button class="db-tool db-toggle-dir" title="Ausrichtung ändern">${toolbarState.vert ? ICONS.horiz : ICONS.vert}</button>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-list" title="Alle Notizen (Sidebar)">📋</button>
-      <button class="db-tool db-btn-new" title="Neue Notiz">➕</button>
+      <button class="db-tool db-btn-list" title="Alle Notizen (Sidebar)">${ICONS.list}</button>
+      <button class="db-tool db-btn-new" title="Neue Notiz">${ICONS.plus}</button>
       <div class="db-sep"></div>
-      <button class="db-tool active" data-tool="cursor" title="Maus (Normal)">🖱️</button>
-      <button class="db-tool" data-tool="highlight" title="Text markieren">🖊️</button>
+      <button class="db-tool active" data-tool="cursor" title="Maus (Normal)">${ICONS.cursor}</button>
+      <button class="db-tool" data-tool="highlight" title="Text markieren">${ICONS.highlighter}</button>
       <div class="db-sep"></div>
-      <button class="db-tool" data-tool="draw" title="Freihand zeichnen">🖌️</button>
-      <button class="db-tool" data-tool="rect" title="Rechteck">⬜</button>
-      <button class="db-tool" data-tool="ellipse" title="Kreis">⭕</button>
-      <button class="db-tool" data-tool="line" title="Linie">📏</button>
+      <button class="db-tool" data-tool="draw" title="Freihand zeichnen">${ICONS.pen}</button>
+      <button class="db-tool" data-tool="rect" title="Rechteck">${ICONS.rect}</button>
+      <button class="db-tool" data-tool="ellipse" title="Kreis">${ICONS.circle}</button>
+      <button class="db-tool" data-tool="line" title="Linie">${ICONS.line}</button>
       <div class="db-sep"></div>
       <div class="db-colors">
-        <div class="db-color" data-c="#ef4444" style="background:#ef4444; border: 2px solid #1e293b;"></div>
+        <div class="db-color active" data-c="#ef4444" style="background:#ef4444;"></div>
         <div class="db-color" data-c="#3b82f6" style="background:#3b82f6;"></div>
         <div class="db-color" data-c="#22c55e" style="background:#22c55e;"></div>
         <div class="db-color" data-c="#eab308" style="background:#eab308;"></div>
         <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
       </div>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-undo" title="Rückgängig (Undo)">↩️</button>
-      <button class="db-tool db-btn-redo" title="Wiederherstellen (Redo)">↪️</button>
+      <button class="db-tool db-btn-undo" title="Rückgängig (Undo)">${ICONS.undo}</button>
+      <button class="db-tool db-btn-redo" title="Wiederherstellen (Redo)">${ICONS.redo}</button>
       <div class="db-sep"></div>
-      <button class="db-tool" data-tool="eraser" title="Radiergummi (Klick auf Zeichnung)">🧽</button>
-      <button class="db-tool db-btn-min" title="Minimieren">${toolbarState.vert ? '🔼' : '◀️'}</button>
-      <button class="db-tool db-btn-close" title="Toolbar komplett ausblenden">✖️</button>
+      <button class="db-tool" data-tool="eraser" title="Radiergummi">${ICONS.eraser}</button>
+      <button class="db-tool db-btn-clear" title="Alles auf dieser Seite löschen">${ICONS.trash}</button>
+      <div class="db-sep"></div>
+      <button class="db-tool db-btn-screenshot" title="Screenshot erstellen">${ICONS.camera}</button>
+      <button class="db-tool db-btn-min" title="Minimieren">${toolbarState.vert ? ICONS.up : ICONS.left}</button>
+      <button class="db-tool db-btn-close" title="Toolbar ausblenden">${ICONS.close}</button>
     </div>
   `;
   shadow.appendChild(drawBar);
@@ -210,10 +254,10 @@ function injectUI() {
   const v = chrome.runtime.getManifest().version;
   sb.innerHTML = `
     <div class="sb-header">
-      <div class="sb-title">📝 WebNotes <span class="ver-tag">v${v}</span></div>
+      <div class="sb-title">WebNotes <span class="ver-tag">v${v}</span></div>
       <div class="sb-actions">
-        <button class="icon-btn sb-refresh" title="Neu laden">🔄</button>
-        <button class="icon-btn sb-close" title="Schließen">×</button>
+        <button class="icon-btn sb-refresh" title="Neu laden">${ICONS.refresh}</button>
+        <button class="icon-btn sb-close" title="Schließen">${ICONS.close}</button>
       </div>
     </div>
     <div class="sb-search-wrap">
@@ -301,26 +345,26 @@ function noteHTML(note) {
   return `
   <div class="nh">
     <div class="nh-l">
-      <span class="dh">⋮⋮</span>
-      <button class="icon-btn p-btn ${note.pinned?'pinned':''}" title="${note.pinned?'Loslösen (fixiert auf Seite)':'Auf Seite fixieren'}">${note.pinned?'\u{1F4CD}':'\u{1F4CC}'}</button>
+      <span class="dh">${ICONS.drag}</span>
+      <button class="icon-btn p-btn ${note.pinned?'pinned':''}" title="${note.pinned?'Loslösen':'Fixieren'}">${note.pinned?ICONS.pinned:ICONS.pin}</button>
       <input class="t-inp" value="${note.title.replace(/"/g,'&quot;')}" placeholder="Titel…">
     </div>
     <div class="nh-r">
       <div class="dp-wrap">
-        <button class="icon-btn c-btn" title="Hintergrundfarbe">🎨</button>
+        <button class="icon-btn c-btn" title="Hintergrundfarbe">${ICONS.palette}</button>
         <div class="dp nc-dp hidden">${nc}</div>
       </div>
-      <button class="icon-btn dup-btn" title="Duplizieren">⧉</button>
-      <button class="icon-btn cp-btn" title="Kompakt (nur Titel)">—</button>
-      <button class="icon-btn ex-btn" title="Vergrößern / Vollbild">□</button>
-      <button class="icon-btn dl-btn" title="Löschen">×</button>
+      <button class="icon-btn dup-btn" title="Duplizieren">${ICONS.duplicate}</button>
+      <button class="icon-btn cp-btn" title="Kompakt">${ICONS.compact}</button>
+      <button class="icon-btn ex-btn" title="Vergrößern">${ICONS.expand}</button>
+      <button class="icon-btn dl-btn" title="Löschen">${ICONS.trash}</button>
     </div>
   </div>
   <div class="fmt-bar">
     <button class="fb-btn b-btn" title="Fett"><b>B</b></button>
     <button class="fb-btn i-btn" title="Kursiv"><i>I</i></button>
     <div class="fmt-sep"></div>
-    <button class="fb-btn tg-btn" title="Tags">🏷️</button>
+    <button class="fb-btn tg-btn" title="Tags">${ICONS.tags}</button>
   </div>
   <div class="nb-wrap">
     <div class="nb" contenteditable="true" spellcheck="true">${note.content}</div>
@@ -486,17 +530,15 @@ function bindEvents(el, note) {
   pb.onclick = () => {
     note.pinned = !note.pinned;
     if (note.pinned) {
-      // Calculate current page position from current viewport position
       note.pageX = parseInt(el.style.left) + scrollX;
       note.pageY = parseInt(el.style.top)  + scrollY;
-      pb.textContent = '📍';
+      pb.innerHTML = ICONS.pinned;
       pb.title = 'Loslösen (fixiert auf Seite)';
       pb.classList.add('pinned');
     } else {
-      // Stay at current viewport position
       note.x = parseInt(el.style.left);
       note.y = parseInt(el.style.top);
-      pb.textContent = '📌';
+      pb.innerHTML = ICONS.pin;
       pb.title = 'Auf Seite fixieren';
       pb.classList.remove('pinned');
     }
@@ -817,10 +859,10 @@ function updateSidebarList(query = '') {
       const cbg     = note.color ? `background:${note.color}33;border-left:3px solid ${note.color};` : '';
       item.innerHTML = `
         <div class="sb-item-actions">
-          <div class="sb-item-action edit" title="Bearbeiten">✏️</div>
-          <div class="sb-item-action del" title="Löschen">🗑️</div>
+          <div class="sb-item-action edit" title="Bearbeiten">${ICONS.pen}</div>
+          <div class="sb-item-action del" title="Löschen">${ICONS.trash}</div>
         </div>
-        <div class="sb-item-title" style="${cbg}">${note.pinned?'📍':'📌'} ${note.title||'Unbenannt'}</div>
+        <div class="sb-item-title" style="${cbg}">${note.pinned?ICONS.pinned:ICONS.pin} ${note.title||'Unbenannt'}</div>
         ${tags ? `<div class="sb-item-tags">${tags}</div>` : ''}
         <div class="sb-item-preview">${preview}…</div>`;
       
@@ -914,6 +956,9 @@ function renderDrawings() {
       el.setAttribute('stroke-linecap', 'round');
       el.setAttribute('stroke-linejoin', 'round');
       el.setAttribute('d', d.data);
+    } else if (d.type === 'line') {
+      el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
+      el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
     } else if (d.type === 'rect') {
       el.setAttribute('x', d.x); el.setAttribute('y', d.y);
       el.setAttribute('width', d.w); el.setAttribute('height', d.h);
@@ -934,10 +979,133 @@ function renderDrawings() {
         drawings = drawings.filter(x => x.id !== d.id);
         saveDrawings();
         el.remove();
+      } else if (activeTool === 'cursor') {
+        // Drag logic
+        e.stopPropagation();
+        let sX = e.pageX, sY = e.pageY;
+        const initialD = JSON.parse(JSON.stringify(d)); // Deep copy
+
+        const mv = (me) => {
+          const dx = me.pageX - sX, dy = me.pageY - sY;
+          if (d.type === 'path') {
+            const parts = initialD.data.split(' ');
+            for (let i = 1; i < parts.length; i += 3) {
+              if (!isNaN(parts[i])) parts[i] = (parseFloat(initialD.data.split(' ')[i]) + dx).toFixed(1);
+              if (!isNaN(parts[i+1])) parts[i+1] = (parseFloat(initialD.data.split(' ')[i+1]) + dy).toFixed(1);
+            }
+            d.data = parts.join(' ');
+            el.setAttribute('d', d.data);
+          } else if (d.type === 'rect') {
+            d.x = (parseFloat(initialD.x) + dx).toFixed(1);
+            d.y = (parseFloat(initialD.y) + dy).toFixed(1);
+            el.setAttribute('x', d.x); el.setAttribute('y', d.y);
+          } else if (d.type === 'ellipse') {
+            d.cx = (parseFloat(initialD.cx) + dx).toFixed(1);
+            d.cy = (parseFloat(initialD.cy) + dy).toFixed(1);
+            el.setAttribute('cx', d.cx); el.setAttribute('cy', d.cy);
+          } else if (d.type === 'line') {
+            d.x1 = (parseFloat(initialD.x1) + dx).toFixed(1);
+            d.y1 = (parseFloat(initialD.y1) + dy).toFixed(1);
+            d.x2 = (parseFloat(initialD.x2) + dx).toFixed(1);
+            d.y2 = (parseFloat(initialD.y2) + dy).toFixed(1);
+            el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
+            el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
+          }
+        };
+
+        const up = () => {
+          saveDrawings();
+          window.removeEventListener('mousemove', mv);
+          window.removeEventListener('mouseup', up);
+        };
+
+        if (selectedDrawingId !== d.id) {
+          selectedDrawingId = d.id;
+          renderDrawings();
+        }
+
+        window.addEventListener('mousemove', mv);
+        window.addEventListener('mouseup', up);
       }
     });
     
     svg.appendChild(el);
+
+    // Render Selection & Resize Handles
+    if (activeTool === 'cursor' && d.id === selectedDrawingId && (d.type === 'rect' || d.type === 'ellipse')) {
+      const handle = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+      handle.setAttribute('fill', '#fff');
+      handle.setAttribute('stroke', '#6366f1');
+      handle.setAttribute('stroke-width', '2');
+      handle.setAttribute('r', '6');
+      handle.style.cursor = 'nwse-resize';
+      handle.style.pointerEvents = 'all';
+
+      const updateHandlePos = () => {
+        if (d.type === 'rect') {
+          handle.setAttribute('cx', parseFloat(d.x) + parseFloat(d.w));
+          handle.setAttribute('cy', parseFloat(d.y) + parseFloat(d.h));
+        } else if (d.type === 'ellipse') {
+          handle.setAttribute('cx', parseFloat(d.cx) + parseFloat(d.rx));
+          handle.setAttribute('cy', parseFloat(d.cy) + parseFloat(d.ry));
+        }
+      };
+      updateHandlePos();
+
+      handle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        let sX = e.pageX, sY = e.pageY;
+        const initialD = JSON.parse(JSON.stringify(d));
+
+        const mv = (me) => {
+          const dx = me.pageX - sX, dy = me.pageY - sY;
+          if (d.type === 'rect') {
+            d.w = Math.max(10, parseFloat(initialD.w) + dx).toFixed(1);
+            d.h = Math.max(10, parseFloat(initialD.h) + dy).toFixed(1);
+            el.setAttribute('width', d.w); el.setAttribute('height', d.h);
+          } else {
+            d.rx = Math.max(5, parseFloat(initialD.rx) + dx).toFixed(1);
+            d.ry = Math.max(5, parseFloat(initialD.ry) + dy).toFixed(1);
+            el.setAttribute('rx', d.rx); el.setAttribute('ry', d.ry);
+          }
+          updateHandlePos();
+        };
+
+        const up = () => {
+          saveDrawings();
+          window.removeEventListener('mousemove', mv);
+          window.removeEventListener('mouseup', up);
+        };
+        window.addEventListener('mousemove', mv);
+        window.addEventListener('mouseup', up);
+      });
+      svg.appendChild(handle);
+    }
+
+    // Line Endpoint Handles
+    if (activeTool === 'cursor' && d.id === selectedDrawingId && d.type === 'line') {
+      [1, 2].forEach(i => {
+        const h = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+        h.setAttribute('fill', '#fff'); h.setAttribute('stroke', '#6366f1'); h.setAttribute('stroke-width', '2'); h.setAttribute('r', '6');
+        h.style.cursor = 'move'; h.style.pointerEvents = 'all';
+        h.setAttribute('cx', d[`x${i}`]); h.setAttribute('cy', d[`y${i}`]);
+
+        h.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          let sX = e.pageX, sY = e.pageY;
+          const initValX = parseFloat(d[`x${i}`]), initValY = parseFloat(d[`y${i}`]);
+          const mv = (me) => {
+            d[`x${i}`] = (initValX + (me.pageX - sX)).toFixed(1);
+            d[`y${i}`] = (initValY + (me.pageY - sY)).toFixed(1);
+            h.setAttribute('cx', d[`x${i}`]); h.setAttribute('cy', d[`y${i}`]);
+            el.setAttribute(`x${i}`, d[`x${i}`]); el.setAttribute(`y${i}`, d[`y${i}`]);
+          };
+          const up = () => { saveDrawings(); window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+          window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+        });
+        svg.appendChild(h);
+      });
+    }
   });
 }
 
@@ -950,20 +1118,40 @@ function setupDrawingBoard(svg, bar) {
   window.addEventListener('resize', updateSvgSize);
   new MutationObserver(updateSvgSize).observe(document.body, { childList: true, subtree: true });
   updateSvgSize();
-  svg.style.background = 'rgba(0,0,0,0.001)'; // Invisible but catches pointer events
+  svg.style.pointerEvents = 'none';
 
   // Toolbar events
   const tools = bar.querySelectorAll('.db-tool[data-tool]');
+  const setTool = (toolName) => {
+    activeTool = toolName;
+    tools.forEach(b => {
+      if (b.dataset.tool === toolName) b.classList.add('active');
+      else b.classList.remove('active');
+    });
+    const needsSurface = ['draw','rect','ellipse','line'].includes(activeTool);
+    svg.style.pointerEvents = needsSurface ? 'all' : 'none';
+    // Allow shapes to be clickable even if svg is 'none'
+    svg.style.cursor = (activeTool === 'cursor') ? 'default' : 'crosshair';
+  };
+
   tools.forEach(btn => {
-    btn.onclick = () => {
-      tools.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      activeTool = btn.dataset.tool;
-      svg.style.pointerEvents = ['draw','rect','ellipse','line','eraser'].includes(activeTool) ? 'all' : 'none';
-      if (activeTool === 'eraser') svg.style.cursor = 'crosshair';
-      else if (activeTool !== 'cursor' && activeTool !== 'highlight') svg.style.cursor = 'crosshair';
-      else svg.style.cursor = 'default';
-    };
+    btn.onclick = () => setTool(btn.dataset.tool);
+  });
+
+  // ESC to reset to cursor & Delete to remove selected
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    if (e.key === 'Escape' && activeTool !== 'cursor') {
+      setTool('cursor');
+    }
+    if (e.key === 'Delete' && selectedDrawingId) {
+      saveDrawingSnapshot();
+      drawings = drawings.filter(d => d.id !== selectedDrawingId);
+      selectedDrawingId = null;
+      saveDrawings();
+      renderDrawings();
+    }
   });
 
   // Action Buttons
@@ -972,22 +1160,35 @@ function setupDrawingBoard(svg, bar) {
     bar.classList.remove('minimized');
     chrome.storage.local.set({ toolbarState });
   };
+  bar.querySelector('.db-btn-clear').onclick = () => {
+    if (confirm('Möchtest du wirklich alle Zeichnungen und Markierungen auf dieser Seite löschen?')) {
+      saveDrawingSnapshot();
+      drawings = drawings.filter(d => normUrl(d.url) !== normUrl(location.href));
+      const highlights = document.querySelectorAll('.webnote-hl');
+      highlights.forEach(h => removeHighlight(h.dataset.wn));
+      saveDrawings();
+      renderDrawings();
+    }
+  };
   bar.querySelector('.db-btn-min').onclick = () => {
     toolbarState.min = true;
     bar.classList.add('minimized');
     chrome.storage.local.set({ toolbarState });
   };
-  bar.querySelector('.db-toggle-dir').onclick = (e) => {
+  bar.querySelector('.db-toggle-dir').onclick = () => {
     toolbarState.vert = !toolbarState.vert;
-    e.target.textContent = toolbarState.vert ? '↔️' : '↕️';
+    bar.querySelector('.db-toggle-dir').innerHTML = toolbarState.vert ? ICONS.horiz : ICONS.vert;
     bar.classList.toggle('vertical', toolbarState.vert);
-    bar.querySelector('.db-btn-min').textContent = toolbarState.vert ? '🔼' : '◀️';
+    bar.querySelector('.db-btn-min').innerHTML = toolbarState.vert ? ICONS.up : ICONS.left;
     chrome.storage.local.set({ toolbarState });
   };
   bar.querySelector('.db-btn-list').onclick = () => toggleSidebar();
   bar.querySelector('.db-btn-new').onclick = () => createNote({ x: 60, y: 120 });
   bar.querySelector('.db-btn-undo').onclick = performUndo;
   bar.querySelector('.db-btn-redo').onclick = performRedo;
+  bar.querySelector('.db-btn-screenshot').onclick = () => {
+    startScreenshotMode();
+  };
   bar.querySelector('.db-btn-close').onclick = () => {
     toolbarState.hidden = true;
     chrome.storage.local.set({ toolbarState });
@@ -1022,8 +1223,8 @@ function setupDrawingBoard(svg, bar) {
 
   bar.querySelectorAll('.db-color').forEach(sw => {
     sw.onclick = () => {
-      bar.querySelectorAll('.db-color').forEach(s => s.style.border = 'none');
-      sw.style.border = '2px solid #1e293b';
+      bar.querySelectorAll('.db-color').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
       activeColor = sw.dataset.c;
     };
   });
@@ -1053,6 +1254,14 @@ function setupDrawingBoard(svg, bar) {
       svg.style.pointerEvents = 'all';
       if (elUnder && elUnder.classList.contains('webnote-hl')) {
         removeHighlight(elUnder.dataset.wn);
+      }
+      return;
+    }
+
+    if (activeTool === 'cursor') {
+      if (selectedDrawingId) {
+        selectedDrawingId = null;
+        renderDrawings();
       }
       return;
     }
@@ -1124,9 +1333,11 @@ function setupDrawingBoard(svg, bar) {
       d.rx = currentShape.getAttribute('rx'); d.ry = currentShape.getAttribute('ry');
       if (d.rx < 5 && d.ry < 5) { currentShape.remove(); return; }
     } else if (activeTool === 'line') {
-      d.type = 'path';
-      d.data = pathData;
-      if (!pathData.includes('L') || pathData.split(' L ')[0] === 'M ' + pathData.split(' L ')[1]) { currentShape.remove(); return; }
+      d.type = 'line';
+      const pts = pathData.split(' ');
+      d.x1 = pts[1]; d.y1 = pts[2];
+      d.x2 = pts[4]; d.y2 = pts[5];
+      if (d.x1 === d.x2 && d.y1 === d.y2) { currentShape.remove(); return; }
     }
     
     currentShape.remove(); // let renderDrawings re-add it with events
@@ -1172,3 +1383,174 @@ setInterval(() => {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 init();
+
+// ── Screenshot Module ───────────────────────────────────────────────────────
+function startScreenshotMode() {
+  const container = document.querySelector('#webnote-shadow-host');
+  if (!container) return;
+  const shadow = container.shadowRoot;
+  
+  const old = shadow.querySelector('.wn-ss-overlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'wn-ss-overlay';
+  overlay.style.pointerEvents = 'all';
+  let mode = 'crop'; 
+  let dest = 'clipboard'; // 'clipboard' or 'download'
+
+  overlay.innerHTML = `
+    <div class="wn-ss-tools">
+      <button class="wn-ss-tool active" data-m="crop" title="Bereich auswählen">${ICONS.crop}</button>
+      <button class="wn-ss-tool" data-m="target" title="Element auswählen">${ICONS.target}</button>
+      <button class="wn-ss-tool" data-m="screen" title="Ganzes Fenster">${ICONS.monitor}</button>
+      <div class="db-sep"></div>
+      <button class="wn-ss-tool wn-ss-dest active" data-d="clipboard" title="In Zwischenablage kopieren">${ICONS.clipboard}</button>
+      <button class="wn-ss-tool wn-ss-dest" data-d="download" title="Als Datei speichern">${ICONS.download}</button>
+      <div class="db-sep"></div>
+      <button class="wn-ss-tool wn-ss-close" title="Abbrechen">${ICONS.close}</button>
+    </div>
+    <div class="wn-ss-hint">Bereich mit der Maus auswählen</div>
+    <div class="wn-ss-area" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.1); pointer-events:none;"></div>
+    <div class="wn-ss-target" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.2); pointer-events:none; z-index:2147483646;"></div>
+  `;
+
+  shadow.appendChild(overlay);
+
+  const tools = overlay.querySelectorAll('.wn-ss-tool[data-m]');
+  const hint = overlay.querySelector('.wn-ss-hint');
+  const areaEl = overlay.querySelector('.wn-ss-area');
+  const targetEl = overlay.querySelector('.wn-ss-target');
+  const destBtns = overlay.querySelectorAll('.wn-ss-dest');
+
+  destBtns.forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      dest = btn.dataset.d;
+      destBtns.forEach(b => b.classList.toggle('active', b.dataset.d === dest));
+    };
+  });
+
+  const setMode = (m) => {
+    mode = m;
+    tools.forEach(t => t.classList.toggle('active', t.dataset.m === m));
+    hint.textContent = m === 'crop' ? 'Bereich mit der Maus auswählen' : 
+                       m === 'target' ? 'Element anklicken' : 'Klicken für Vollbild';
+    areaEl.style.display = 'none';
+    targetEl.style.display = 'none';
+  };
+
+  tools.forEach(t => t.onclick = (e) => { e.stopPropagation(); setMode(t.dataset.m); });
+  overlay.querySelector('.wn-ss-close').onclick = (e) => { e.stopPropagation(); overlay.remove(); };
+
+  let isDragging = false, sX, sY;
+
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target !== overlay && e.target !== areaEl) return;
+    if (mode === 'screen') { doCapture(); return; }
+    if (mode === 'target') return;
+
+    isDragging = true;
+    sX = e.clientX; sY = e.clientY;
+    areaEl.style.left = sX + 'px'; areaEl.style.top = sY + 'px';
+    areaEl.style.width = '0px'; areaEl.style.height = '0px';
+    areaEl.style.display = 'block';
+  });
+
+  overlay.addEventListener('mousemove', (e) => {
+    if (mode === 'target') {
+      overlay.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      overlay.style.pointerEvents = 'all';
+      if (el && el.id !== 'webnote-shadow-host') {
+        const r = el.getBoundingClientRect();
+        targetEl.style.left = r.left + 'px'; targetEl.style.top = r.top + 'px';
+        targetEl.style.width = r.width + 'px'; targetEl.style.height = r.height + 'px';
+        targetEl.style.display = 'block';
+      }
+    }
+    if (!isDragging) return;
+    const curX = e.clientX, curY = e.clientY;
+    const x = Math.min(sX, curX), y = Math.min(sY, curY);
+    const w = Math.abs(curX - sX), h = Math.abs(curY - sY);
+    areaEl.style.left = x + 'px'; areaEl.style.top = y + 'px';
+    areaEl.style.width = w + 'px'; areaEl.style.height = h + 'px';
+  });
+
+  overlay.addEventListener('mouseup', (e) => {
+    if (mode === 'target') {
+      overlay.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      overlay.style.pointerEvents = 'all';
+      if (el) {
+        const r = el.getBoundingClientRect();
+        doCapture(r.left, r.top, r.width, r.height);
+      }
+      return;
+    }
+    if (!isDragging) return;
+    isDragging = false;
+    const r = areaEl.getBoundingClientRect();
+    if (r.width > 5 && r.height > 5) {
+      doCapture(r.left, r.top, r.width, r.height);
+    }
+  });
+
+  function doCapture(x, y, w, h) {
+    overlay.remove();
+    setTimeout(() => {
+      chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE' }, (res) => {
+        if (!res || !res.dataUrl) return;
+        if (!x && !y) {
+          handleResult(res.dataUrl);
+        } else {
+          const img = new Image();
+          img.onload = () => {
+            const dpr = window.devicePixelRatio || 1;
+            const canvas = document.createElement('canvas');
+            canvas.width = w * dpr; canvas.height = h * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
+            handleResult(canvas.toDataURL('image/png'));
+          };
+          img.src = res.dataUrl;
+        }
+      });
+    }, 150);
+  }
+
+  async function handleResult(dataUrl) {
+    if (dest === 'clipboard') {
+      try {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        showToast('In Zwischenablage kopiert!');
+      } catch (err) {
+        console.error('Clipboard error:', err);
+        download(dataUrl);
+      }
+    } else {
+      download(dataUrl);
+    }
+  }
+
+  function download(dataUrl) {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `webnote-ss-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:12px 24px;border-radius:100px;z-index:2147483647;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,0.3);';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity='0'; t.style.transition='0.3s'; setTimeout(()=>t.remove(), 300); }, 2000);
+  }
+}
