@@ -3,9 +3,9 @@
 
 function setupMenus() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: 'add-note',       title: 'WebNote: Notiz erstellen', contexts: ['all'] });
-    chrome.contextMenus.create({ id: 'add-note-sel',   title: 'WebNote: Notiz zu Auswahl', contexts: ['selection'] });
-    chrome.contextMenus.create({ id: 'add-highlight',  title: 'WebNote: Text markieren 🖊',  contexts: ['selection'] });
+    chrome.contextMenus.create({ id: 'add-note',       title: 'WebNote: Create Note', contexts: ['all'] });
+    chrome.contextMenus.create({ id: 'add-note-sel',   title: 'WebNote: Note from Selection', contexts: ['selection'] });
+    chrome.contextMenus.create({ id: 'add-highlight',  title: 'WebNote: Highlight Text 🖊',  contexts: ['selection'] });
   });
 }
 

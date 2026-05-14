@@ -209,21 +209,21 @@ function injectUI() {
   }
 
   drawBar.innerHTML = `
-    <div class="db-min-icon" title="WebNote öffnen">${ICONS.highlighter}</div>
+    <div class="db-min-icon" title="Open WebNote">${ICONS.highlighter}</div>
     <div class="db-full">
-      <div class="db-drag-handle" title="Verschieben">${ICONS.drag}</div>
-      <button class="db-tool db-toggle-dir" title="Ausrichtung ändern">${toolbarState.vert ? ICONS.horiz : ICONS.vert}</button>
+      <div class="db-drag-handle" title="Drag to Move">${ICONS.drag}</div>
+      <button class="db-tool db-toggle-dir" title="Change Orientation">${toolbarState.vert ? ICONS.horiz : ICONS.vert}</button>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-list" title="Alle Notizen (Sidebar)">${ICONS.list}</button>
-      <button class="db-tool db-btn-new" title="Neue Notiz">${ICONS.plus}</button>
+      <button class="db-tool db-btn-list" title="All Notes (Sidebar)">${ICONS.list}</button>
+      <button class="db-tool db-btn-new" title="New Note">${ICONS.plus}</button>
       <div class="db-sep"></div>
-      <button class="db-tool active" data-tool="cursor" title="Maus (Normal)">${ICONS.cursor}</button>
-      <button class="db-tool" data-tool="highlight" title="Text markieren">${ICONS.highlighter}</button>
+      <button class="db-tool active" data-tool="cursor" title="Mouse (Normal)">${ICONS.cursor}</button>
+      <button class="db-tool" data-tool="highlight" title="Highlight Text">${ICONS.highlighter}</button>
       <div class="db-sep"></div>
-      <button class="db-tool" data-tool="draw" title="Freihand zeichnen">${ICONS.pen}</button>
-      <button class="db-tool" data-tool="rect" title="Rechteck">${ICONS.rect}</button>
-      <button class="db-tool" data-tool="ellipse" title="Kreis">${ICONS.circle}</button>
-      <button class="db-tool" data-tool="line" title="Linie">${ICONS.line}</button>
+      <button class="db-tool" data-tool="draw" title="Freehand Drawing">${ICONS.pen}</button>
+      <button class="db-tool" data-tool="rect" title="Rectangle">${ICONS.rect}</button>
+      <button class="db-tool" data-tool="ellipse" title="Circle">${ICONS.circle}</button>
+      <button class="db-tool" data-tool="line" title="Line">${ICONS.line}</button>
       <div class="db-sep"></div>
       <div class="db-colors">
         <div class="db-color active" data-c="#ef4444" style="background:#ef4444;"></div>
@@ -233,15 +233,15 @@ function injectUI() {
         <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
       </div>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-undo" title="Rückgängig (Undo)">${ICONS.undo}</button>
-      <button class="db-tool db-btn-redo" title="Wiederherstellen (Redo)">${ICONS.redo}</button>
+      <button class="db-tool db-btn-undo" title="Undo">${ICONS.undo}</button>
+      <button class="db-tool db-btn-redo" title="Redo">${ICONS.redo}</button>
       <div class="db-sep"></div>
-      <button class="db-tool" data-tool="eraser" title="Radiergummi">${ICONS.eraser}</button>
-      <button class="db-tool db-btn-clear" title="Alles auf dieser Seite löschen">${ICONS.trash}</button>
+      <button class="db-tool" data-tool="eraser" title="Eraser">${ICONS.eraser}</button>
+      <button class="db-tool db-btn-clear" title="Clear all on this page">${ICONS.trash}</button>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-screenshot" title="Screenshot erstellen">${ICONS.camera}</button>
-      <button class="db-tool db-btn-min" title="Minimieren">${toolbarState.vert ? ICONS.up : ICONS.left}</button>
-      <button class="db-tool db-btn-close" title="Toolbar ausblenden">${ICONS.close}</button>
+      <button class="db-tool db-btn-screenshot" title="Capture Screenshot">${ICONS.camera}</button>
+      <button class="db-tool db-btn-min" title="Minimize">${toolbarState.vert ? ICONS.up : ICONS.left}</button>
+      <button class="db-tool db-btn-close" title="Hide Toolbar">${ICONS.close}</button>
     </div>
   `;
   shadow.appendChild(drawBar);
@@ -256,29 +256,29 @@ function injectUI() {
     <div class="sb-header">
       <div class="sb-title">WebNotes <span class="ver-tag">v${v}</span></div>
       <div class="sb-actions">
-        <button class="icon-btn sb-refresh" title="Neu laden">${ICONS.refresh}</button>
-        <button class="icon-btn sb-close" title="Schließen">${ICONS.close}</button>
+        <button class="icon-btn sb-refresh" title="Refresh">${ICONS.refresh}</button>
+        <button class="icon-btn sb-close" title="Close">${ICONS.close}</button>
       </div>
     </div>
     <div class="sb-search-wrap">
-      <input class="sb-search" placeholder="Suchen…" type="text">
+      <input class="sb-search" placeholder="Search…" type="text">
       <div class="sb-controls">
-        <select class="sb-sort-sel" title="Sortieren nach">
-          <option value="date-desc">Neueste zuerst</option>
-          <option value="date-asc">Älteste zuerst</option>
-          <option value="alpha">Alphabetisch</option>
-          <option value="manual">Manuell (Drag & Drop)</option>
+        <select class="sb-sort-sel" title="Sort by">
+          <option value="date-desc">Newest first</option>
+          <option value="date-asc">Oldest first</option>
+          <option value="alpha">Alphabetical</option>
+          <option value="manual">Manual (Drag & Drop)</option>
         </select>
-        <select class="sb-group-sel" title="Gruppieren nach">
-          <option value="none">Keine Gruppe</option>
-          <option value="tags">Nach Tags</option>
-          <option value="month">Nach Monat</option>
+        <select class="sb-group-sel" title="Group by">
+          <option value="none">No Group</option>
+          <option value="tags">By Tags</option>
+          <option value="month">By Month</option>
         </select>
       </div>
     </div>
     <div class="sb-notes"></div>
     <div class="sb-footer">
-      <button class="new-note-btn">+ Neue Notiz</button>
+      <button class="new-note-btn">+ New Note</button>
     </div>`;
   shadow.appendChild(sb);
 
@@ -303,7 +303,7 @@ function createNote(opts = {}) {
   const note = {
     id:          Date.now().toString(),
     url:         normUrl(location.href),
-    title:       opts.title   || 'Neue Notiz',
+    title:       opts.title   || 'New Note',
     content:     opts.content || '',
     tags:        opts.tags    || [],
     x:  vx, y:  vy,
@@ -346,23 +346,23 @@ function noteHTML(note) {
   <div class="nh">
     <div class="nh-l">
       <span class="dh">${ICONS.drag}</span>
-      <button class="icon-btn p-btn ${note.pinned?'pinned':''}" title="${note.pinned?'Loslösen':'Fixieren'}">${note.pinned?ICONS.pinned:ICONS.pin}</button>
-      <input class="t-inp" value="${note.title.replace(/"/g,'&quot;')}" placeholder="Titel…">
+      <button class="icon-btn p-btn ${note.pinned?'pinned':''}" title="${note.pinned?'Unpin':'Pin'}">${note.pinned?ICONS.pinned:ICONS.pin}</button>
+      <input class="t-inp" value="${note.title.replace(/"/g,'&quot;')}" placeholder="Title…">
     </div>
     <div class="nh-r">
       <div class="dp-wrap">
-        <button class="icon-btn c-btn" title="Hintergrundfarbe">${ICONS.palette}</button>
+        <button class="icon-btn c-btn" title="Background Color">${ICONS.palette}</button>
         <div class="dp nc-dp hidden">${nc}</div>
       </div>
-      <button class="icon-btn dup-btn" title="Duplizieren">${ICONS.duplicate}</button>
-      <button class="icon-btn cp-btn" title="Kompakt">${ICONS.compact}</button>
-      <button class="icon-btn ex-btn" title="Vergrößern">${ICONS.expand}</button>
-      <button class="icon-btn dl-btn" title="Löschen">${ICONS.trash}</button>
+      <button class="icon-btn dup-btn" title="Duplicate">${ICONS.duplicate}</button>
+      <button class="icon-btn cp-btn" title="Compact">${ICONS.compact}</button>
+      <button class="icon-btn ex-btn" title="Expand">${ICONS.expand}</button>
+      <button class="icon-btn dl-btn" title="Delete">${ICONS.trash}</button>
     </div>
   </div>
   <div class="fmt-bar">
-    <button class="fb-btn b-btn" title="Fett"><b>B</b></button>
-    <button class="fb-btn i-btn" title="Kursiv"><i>I</i></button>
+    <button class="fb-btn b-btn" title="Bold"><b>B</b></button>
+    <button class="fb-btn i-btn" title="Italic"><i>I</i></button>
     <div class="fmt-sep"></div>
     <button class="fb-btn tg-btn" title="Tags">${ICONS.tags}</button>
   </div>
@@ -515,12 +515,12 @@ function bindEvents(el, note) {
     } else if (note._expanded) {
       note.width  = note._baseW || 280; note.height = note._baseH || 220;
       note._expanded = false; note.displayMode = 'full';
-      q('.ex-btn').title = 'Vergrößern';
+      q('.ex-btn').title = 'Expand';
     } else {
       note._baseW = note.width || 280; note._baseH = note.height || 220;
       note.width  = Math.max(note._baseW, 480); note.height = Math.max(note._baseH, 380);
       note._expanded = true; note.displayMode = 'full';
-      q('.ex-btn').title = 'Auf Originalgröße zurück';
+      q('.ex-btn').title = 'Restore original size';
     }
     applyStyle(el, note); positionNote(el, note); saveNotes();
   };
@@ -533,13 +533,13 @@ function bindEvents(el, note) {
       note.pageX = parseInt(el.style.left) + scrollX;
       note.pageY = parseInt(el.style.top)  + scrollY;
       pb.innerHTML = ICONS.pinned;
-      pb.title = 'Loslösen (fixiert auf Seite)';
+      pb.title = 'Unpin (fixed on page)';
       pb.classList.add('pinned');
     } else {
       note.x = parseInt(el.style.left);
       note.y = parseInt(el.style.top);
       pb.innerHTML = ICONS.pin;
-      pb.title = 'Auf Seite fixieren';
+      pb.title = 'Pin to page';
       pb.classList.remove('pinned');
     }
     applyStyle(el, note);
@@ -729,7 +729,7 @@ function makeHighlightEl(hl) {
   mark.className = 'webnote-hl';
   mark.style.cssText = `background:${hl.color}!important;border-radius:2px;cursor:pointer;padding:0 1px;box-decoration-break:clone;`;
   mark.dataset.wn = hl.id;
-  mark.title = 'WebNote Markierung – Klicken zum Entfernen';
+  mark.title = 'WebNote Highlight – Click to remove';
   return mark;
 }
 
@@ -772,7 +772,7 @@ function updateSidebarList(query = '') {
   ));
   
   if (!visible.length) {
-    list.innerHTML = `<div class="empty-hint">${q ? 'Keine Treffer.' : 'Keine Notizen auf dieser Seite.'}</div>`;
+    list.innerHTML = `<div class="empty-hint">${q ? 'No results found.' : 'No notes on this page.'}</div>`;
     return;
   }
 
@@ -790,12 +790,12 @@ function updateSidebarList(query = '') {
   // 2. Group
   let groups = {};
   if (sidebarGroup === 'none') {
-    groups['Alle Notizen'] = visible;
+    groups['All Notes'] = visible;
   } else if (sidebarGroup === 'tags') {
     visible.forEach(n => {
       if (!n.tags || n.tags.length === 0) {
-        if (!groups['Ohne Tag']) groups['Ohne Tag'] = [];
-        groups['Ohne Tag'].push(n);
+        if (!groups['No Tags']) groups['No Tags'] = [];
+        groups['No Tags'].push(n);
       } else {
         n.tags.forEach(t => {
           const key = `#${t}`;
@@ -805,7 +805,7 @@ function updateSidebarList(query = '') {
       }
     });
   } else if (sidebarGroup === 'month') {
-    const formatter = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
+    const formatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
     visible.forEach(n => {
       const d = new Date(parseInt(n.id));
       const key = formatter.format(d);
@@ -855,14 +855,14 @@ function updateSidebarList(query = '') {
       }
 
       const tags    = note.tags.map(t => `<span class="sb-tag">#${t}</span>`).join(' ');
-      const preview = note.content.replace(/<[^>]+>/g,'').substring(0, 50) || '(leer)';
+      const preview = note.content.replace(/<[^>]+>/g,'').substring(0, 50) || '(empty)';
       const cbg     = note.color ? `background:${note.color}33;border-left:3px solid ${note.color};` : '';
       item.innerHTML = `
         <div class="sb-item-actions">
-          <div class="sb-item-action edit" title="Bearbeiten">${ICONS.pen}</div>
-          <div class="sb-item-action del" title="Löschen">${ICONS.trash}</div>
+          <div class="sb-item-action edit" title="Edit">${ICONS.pen}</div>
+          <div class="sb-item-action del" title="Delete">${ICONS.trash}</div>
         </div>
-        <div class="sb-item-title" style="${cbg}">${note.pinned?ICONS.pinned:ICONS.pin} ${note.title||'Unbenannt'}</div>
+        <div class="sb-item-title" style="${cbg}">${note.pinned?ICONS.pinned:ICONS.pin} ${note.title||'Untitled'}</div>
         ${tags ? `<div class="sb-item-tags">${tags}</div>` : ''}
         <div class="sb-item-preview">${preview}…</div>`;
       
@@ -1161,7 +1161,7 @@ function setupDrawingBoard(svg, bar) {
     chrome.storage.local.set({ toolbarState });
   };
   bar.querySelector('.db-btn-clear').onclick = () => {
-    if (confirm('Möchtest du wirklich alle Zeichnungen und Markierungen auf dieser Seite löschen?')) {
+    if (confirm('Do you really want to delete all drawings and highlights on this page?')) {
       saveDrawingSnapshot();
       drawings = drawings.filter(d => normUrl(d.url) !== normUrl(location.href));
       const highlights = document.querySelectorAll('.webnote-hl');
@@ -1401,16 +1401,16 @@ function startScreenshotMode() {
 
   overlay.innerHTML = `
     <div class="wn-ss-tools">
-      <button class="wn-ss-tool active" data-m="crop" title="Bereich auswählen">${ICONS.crop}</button>
-      <button class="wn-ss-tool" data-m="target" title="Element auswählen">${ICONS.target}</button>
-      <button class="wn-ss-tool" data-m="screen" title="Ganzes Fenster">${ICONS.monitor}</button>
+      <button class="wn-ss-tool active" data-m="crop" title="Select Area">${ICONS.crop}</button>
+      <button class="wn-ss-tool" data-m="target" title="Select Element">${ICONS.target}</button>
+      <button class="wn-ss-tool" data-m="screen" title="Full Screen">${ICONS.monitor}</button>
       <div class="db-sep"></div>
-      <button class="wn-ss-tool wn-ss-dest active" data-d="clipboard" title="In Zwischenablage kopieren">${ICONS.clipboard}</button>
-      <button class="wn-ss-tool wn-ss-dest" data-d="download" title="Als Datei speichern">${ICONS.download}</button>
+      <button class="wn-ss-tool wn-ss-dest active" data-d="clipboard" title="Copy to Clipboard">${ICONS.clipboard}</button>
+      <button class="wn-ss-tool wn-ss-dest" data-d="download" title="Save as File">${ICONS.download}</button>
       <div class="db-sep"></div>
-      <button class="wn-ss-tool wn-ss-close" title="Abbrechen">${ICONS.close}</button>
+      <button class="wn-ss-tool wn-ss-close" title="Cancel">${ICONS.close}</button>
     </div>
-    <div class="wn-ss-hint">Bereich mit der Maus auswählen</div>
+    <div class="wn-ss-hint">Select an area with the mouse</div>
     <div class="wn-ss-area" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.1); pointer-events:none;"></div>
     <div class="wn-ss-target" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.2); pointer-events:none; z-index:2147483646;"></div>
   `;
@@ -1434,8 +1434,8 @@ function startScreenshotMode() {
   const setMode = (m) => {
     mode = m;
     tools.forEach(t => t.classList.toggle('active', t.dataset.m === m));
-    hint.textContent = m === 'crop' ? 'Bereich mit der Maus auswählen' : 
-                       m === 'target' ? 'Element anklicken' : 'Klicken für Vollbild';
+    hint.textContent = m === 'crop' ? 'Select an area with the mouse' : 
+                       m === 'target' ? 'Click on an element' : 'Click for full screen';
     areaEl.style.display = 'none';
     targetEl.style.display = 'none';
   };
@@ -1527,7 +1527,7 @@ function startScreenshotMode() {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob })
         ]);
-        showToast('In Zwischenablage kopiert!');
+        showToast('Copied to clipboard!');
       } catch (err) {
         console.error('Clipboard error:', err);
         download(dataUrl);
