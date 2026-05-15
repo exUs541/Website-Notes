@@ -1215,7 +1215,11 @@ function setupDrawingBoard(svg, bar) {
   });
 
   // Action Buttons
-  bar.querySelector('.db-min-icon').onclick = () => {
+  bar.querySelector('.db-min-icon').onclick = (e) => {
+    if (minIcon.dataset.dragged === 'true') {
+      minIcon.dataset.dragged = 'false';
+      return;
+    }
     // 1. Ghost measurement to avoid flicker
     const ghost = bar.cloneNode(true);
     ghost.style.visibility = 'hidden';
@@ -1315,8 +1319,15 @@ function setupDrawingBoard(svg, bar) {
       e.preventDefault();
       sX = e.clientX; sY = e.clientY;
       oL = bar.offsetLeft; oT = bar.offsetTop;
+      dragEl.dataset.dragged = 'false';
+      
       const mv = me => {
-        const nx = oL + (me.clientX - sX), ny = oT + (me.clientY - sY);
+        const dx = me.clientX - sX;
+        const dy = me.clientY - sY;
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          dragEl.dataset.dragged = 'true';
+        }
+        const nx = oL + dx, ny = oT + dy;
         bar.style.left = `${nx}px`; bar.style.top = `${ny}px`;
         toolbarState.x = nx; toolbarState.y = ny;
       };
