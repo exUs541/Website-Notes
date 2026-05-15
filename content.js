@@ -42,14 +42,14 @@ const ICONS = {
 
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let notes      = [];
+let notes = [];
 let highlights = [];
-let rules      = { hiddenUrls: [] };
-let shadow     = null;
+let rules = { hiddenUrls: [] };
+let shadow = null;
 let sidebarSort = 'date-desc';
 let sidebarGroup = 'none';
 
-let drawings   = [];
+let drawings = [];
 let activeTool = 'cursor'; // cursor, highlight, draw, rect, ellipse
 let activeColor = '#ef4444'; // default red
 let selectedDrawingId = null;
@@ -86,7 +86,7 @@ function performRedo() {
 }
 
 const NOTE_COLORS = [
-  { v: null,      bg: '#ffffff', label: 'Standard' },
+  { v: null, bg: '#ffffff', label: 'Standard' },
   { v: '#fef9c3', bg: '#fef9c3', label: 'Gelb' },
   { v: '#dcfce7', bg: '#dcfce7', label: 'Grün' },
   { v: '#dbeafe', bg: '#dbeafe', label: 'Blau' },
@@ -95,15 +95,15 @@ const NOTE_COLORS = [
   { v: '#ffedd5', bg: '#ffedd5', label: 'Orange' },
   { v: '#f1f5f9', bg: '#f1f5f9', label: 'Grau' },
 ];
-const TEXT_COLORS = ['#1e293b','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899','#ffffff'];
-const HL_COLORS   = ['#fef08a','#bbf7d0','#bfdbfe','#fbcfe8','#ddd6fe','#fed7aa', null];
+const TEXT_COLORS = ['#1e293b', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#ffffff'];
+const HL_COLORS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#ddd6fe', '#fed7aa', null];
 
 let activeHlColor = '#fef08a';
 
 // ── URL Helpers ──────────────────────────────────────────────────────────────
 function normUrl(u) {
   try { const x = new URL(u); x.hash = ''; return x.toString().replace(/\/$/, ''); }
-  catch(_) { return u; }
+  catch (_) { return u; }
 }
 
 // ── Note Migration (old schema → new schema) ──────────────────────────────────
@@ -121,7 +121,7 @@ function migrateNote(note) {
     note.x = Math.max(20, Math.min(note.x || 80, 500));
     note.y = Math.max(60, Math.min(note.y || 100, 400));
   }
-  if (!note.pageX) note.pageX = (note.x || 80)  + (window.scrollX || 0);
+  if (!note.pageX) note.pageX = (note.x || 80) + (window.scrollX || 0);
   if (!note.pageY) note.pageY = (note.y || 100) + (window.scrollY || 0);
 
   // Normalize display mode (old: 'minimized' → just go 'full')
@@ -133,13 +133,13 @@ function migrateNote(note) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const data = await chrome.storage.local.get(['notes','highlights','rules','sidebarSort','sidebarGroup','drawings','toolbarState']);
-    notes      = (data.notes || []).map(migrateNote);
+    const data = await chrome.storage.local.get(['notes', 'highlights', 'rules', 'sidebarSort', 'sidebarGroup', 'drawings', 'toolbarState']);
+    notes = (data.notes || []).map(migrateNote);
     highlights = data.highlights || [];
-    rules      = data.rules      || { hiddenUrls: [] };
-    sidebarSort  = data.sidebarSort  || 'date-desc';
+    rules = data.rules || { hiddenUrls: [] };
+    sidebarSort = data.sidebarSort || 'date-desc';
     sidebarGroup = data.sidebarGroup || 'none';
-    drawings   = data.drawings || [];
+    drawings = data.drawings || [];
     toolbarState = data.toolbarState || { x: null, y: 20, min: false, vert: false, hidden: false };
     injectUI();
     renderPageNotes();
@@ -148,7 +148,7 @@ async function init() {
     updateBadge();
     window.addEventListener('scroll', updatePinnedPositions, { passive: true });
     console.log(`[WebNote] v${chrome.runtime.getManifest().version} ready`);
-  } catch(e) {
+  } catch (e) {
     console.error('[WebNote] init failed', e);
   }
 }
@@ -163,7 +163,7 @@ function updatePinnedPositions() {
     const el = shadow.querySelector(`#note-${note.id}`);
     if (el) {
       el.style.left = `${note.pageX - scrollX}px`;
-      el.style.top  = `${note.pageY - scrollY}px`;
+      el.style.top = `${note.pageY - scrollY}px`;
     }
   });
   const svg = shadow.querySelector('#webnote-drawing-board');
@@ -293,10 +293,10 @@ function injectUI() {
   sb.querySelector('.sb-sort-sel').value = sidebarSort;
   sb.querySelector('.sb-group-sel').value = sidebarGroup;
 
-  sb.querySelector('.sb-refresh').onclick  = () => updateSidebarList(sb.querySelector('.sb-search').value);
-  sb.querySelector('.sb-close').onclick    = toggleSidebar;
+  sb.querySelector('.sb-refresh').onclick = () => updateSidebarList(sb.querySelector('.sb-search').value);
+  sb.querySelector('.sb-close').onclick = toggleSidebar;
   sb.querySelector('.new-note-btn').onclick = () => createNote({ x: 60, y: 120 });
-  sb.querySelector('.sb-search').oninput   = (e) => updateSidebarList(e.target.value);
+  sb.querySelector('.sb-search').oninput = (e) => updateSidebarList(e.target.value);
   sb.querySelector('.sb-sort-sel').onchange = (e) => { sidebarSort = e.target.value; saveNotes(); updateSidebarList(sb.querySelector('.sb-search').value); };
   sb.querySelector('.sb-group-sel').onchange = (e) => { sidebarGroup = e.target.value; saveNotes(); updateSidebarList(sb.querySelector('.sb-search').value); };
 
@@ -305,20 +305,20 @@ function injectUI() {
 
 // ── Note Creation ─────────────────────────────────────────────────────────────
 function createNote(opts = {}) {
-  const vx = Math.max(20, Math.min(opts.x ?? 60, (window.innerWidth  || 800) - 310));
+  const vx = Math.max(20, Math.min(opts.x ?? 60, (window.innerWidth || 800) - 310));
   const vy = Math.max(60, Math.min(opts.y ?? 120, (window.innerHeight || 600) - 250));
   const note = {
-    id:          Date.now().toString(),
-    url:         normUrl(location.href),
-    title:       opts.title   || 'New Note',
-    content:     opts.content || '',
-    tags:        opts.tags    || [],
-    x:  vx, y:  vy,
+    id: Date.now().toString(),
+    url: normUrl(location.href),
+    title: opts.title || 'New Note',
+    content: opts.content || '',
+    tags: opts.tags || [],
+    x: vx, y: vy,
     pageX: vx + scrollX, pageY: vy + scrollY,
-    width:  opts.width  || 280,
+    width: opts.width || 280,
     height: opts.height || 220,
     displayMode: 'full',
-    color:  opts.color || null,
+    color: opts.color || null,
     pinned: false,
   };
   notes.push(note);
@@ -342,8 +342,8 @@ function renderNote(note) {
 }
 
 function noteHTML(note) {
-  const nc = NOTE_COLORS.map((c,i) =>
-    `<div class="sw ns" data-c="${c.v ?? ''}" style="background:${c.bg};${i===0?'border:2px solid #d1d5db':''}" title="${c.label}"></div>`
+  const nc = NOTE_COLORS.map((c, i) =>
+    `<div class="sw ns" data-c="${c.v ?? ''}" style="background:${c.bg};${i === 0 ? 'border:2px solid #d1d5db' : ''}" title="${c.label}"></div>`
   ).join('');
   const chips = note.tags.map(t =>
     `<span class="tag-chip">${t}<button class="tag-rm" data-t="${t}">×</button></span>`
@@ -353,8 +353,8 @@ function noteHTML(note) {
   <div class="nh">
     <div class="nh-l">
       <span class="dh">${ICONS.drag}</span>
-      <button class="icon-btn p-btn ${note.pinned?'pinned':''}" title="${note.pinned?'Unpin':'Pin'}">${note.pinned?ICONS.pinned:ICONS.pin}</button>
-      <input class="t-inp" value="${note.title.replace(/"/g,'&quot;')}" placeholder="Title…">
+      <button class="icon-btn p-btn ${note.pinned ? 'pinned' : ''}" title="${note.pinned ? 'Unpin' : 'Pin'}">${note.pinned ? ICONS.pinned : ICONS.pin}</button>
+      <input class="t-inp" value="${note.title.replace(/"/g, '&quot;')}" placeholder="Title…">
     </div>
     <div class="nh-r">
       <div class="dp-wrap">
@@ -391,10 +391,10 @@ function applyStyle(el, note) {
 function positionNote(el, note) {
   if (note.pinned) {
     el.style.left = `${note.pageX - scrollX}px`;
-    el.style.top  = `${note.pageY - scrollY}px`;
+    el.style.top = `${note.pageY - scrollY}px`;
   } else {
     el.style.left = `${note.x}px`;
-    el.style.top  = `${note.y}px`;
+    el.style.top = `${note.y}px`;
   }
   if (note.displayMode === 'full') {
     el.style.width = `${note.width}px`; el.style.height = `${note.height}px`;
@@ -405,7 +405,7 @@ function positionNote(el, note) {
 
 // ── Events ────────────────────────────────────────────────────────────────────
 function bindEvents(el, note) {
-  const q  = s => el.querySelector(s);
+  const q = s => el.querySelector(s);
   const qa = s => el.querySelectorAll(s);
 
   // Title
@@ -429,8 +429,8 @@ function bindEvents(el, note) {
     }
   };
   document.addEventListener('selectionchange', trackSel);
-  nb.addEventListener('mouseup',  trackSel);
-  nb.addEventListener('keyup',    trackSel);
+  nb.addEventListener('mouseup', trackSel);
+  nb.addEventListener('keyup', trackSel);
   // Fallback: catch mouseup anywhere in the shadow host
   document.addEventListener('mouseup', trackSel);
 
@@ -448,15 +448,15 @@ function bindEvents(el, note) {
 
     try {
       let tag = 'span';
-      if (type === 'bold')   tag = 'strong';
+      if (type === 'bold') tag = 'strong';
       if (type === 'italic') tag = 'em';
       const wrap = document.createElement(tag);
-      if (type === 'color')     wrap.style.color      = value;
+      if (type === 'color') wrap.style.color = value;
       if (type === 'highlight') wrap.style.background = value;
 
       try {
         savedRange.surroundContents(wrap);
-      } catch(_) {
+      } catch (_) {
         // Cross-element selection (e.g. selection spans multiple elements)
         const frag = savedRange.extractContents();
         wrap.appendChild(frag);
@@ -464,7 +464,7 @@ function bindEvents(el, note) {
       }
       note.content = nb.innerHTML;
       saveNotes();
-    } catch(e) {
+    } catch (e) {
       console.error('[WebNote] applyFmt error:', e);
     }
     savedRange = null;
@@ -520,12 +520,12 @@ function bindEvents(el, note) {
     if (note.displayMode === 'compact') {
       note.displayMode = 'full';
     } else if (note._expanded) {
-      note.width  = note._baseW || 280; note.height = note._baseH || 220;
+      note.width = note._baseW || 280; note.height = note._baseH || 220;
       note._expanded = false; note.displayMode = 'full';
       q('.ex-btn').title = 'Expand';
     } else {
       note._baseW = note.width || 280; note._baseH = note.height || 220;
-      note.width  = Math.max(note._baseW, 480); note.height = Math.max(note._baseH, 380);
+      note.width = Math.max(note._baseW, 480); note.height = Math.max(note._baseH, 380);
       note._expanded = true; note.displayMode = 'full';
       q('.ex-btn').title = 'Restore original size';
     }
@@ -538,7 +538,7 @@ function bindEvents(el, note) {
     note.pinned = !note.pinned;
     if (note.pinned) {
       note.pageX = parseInt(el.style.left) + scrollX;
-      note.pageY = parseInt(el.style.top)  + scrollY;
+      note.pageY = parseInt(el.style.top) + scrollY;
       pb.innerHTML = ICONS.pinned;
       pb.title = 'Unpin (fixed on page)';
       pb.classList.add('pinned');
@@ -573,23 +573,23 @@ function bindEvents(el, note) {
 function applyFormatRange(range, type, value) {
   try {
     let tag;
-    if      (type === 'bold')      tag = 'strong';
-    else if (type === 'italic')    tag = 'em';
-    else                           tag = 'span';
+    if (type === 'bold') tag = 'strong';
+    else if (type === 'italic') tag = 'em';
+    else tag = 'span';
 
     const wrapper = document.createElement(tag);
-    if (type === 'color')     wrapper.style.color      = value;
+    if (type === 'color') wrapper.style.color = value;
     if (type === 'highlight') wrapper.style.background = value;
 
     // surroundContents fails if selection crosses element boundaries
     try {
       range.surroundContents(wrapper);
-    } catch(_) {
+    } catch (_) {
       const fragment = range.extractContents();
       wrapper.appendChild(fragment);
       range.insertNode(wrapper);
     }
-  } catch(e) {
+  } catch (e) {
     console.warn('[WebNote] Format failed:', e);
   }
 }
@@ -643,7 +643,7 @@ function resize(el, note, rz) {
     e.preventDefault();
     const sW = el.offsetWidth, sH = el.offsetHeight, sX = e.clientX, sY = e.clientY;
     const mv = me => {
-      note.width  = Math.max(200, sW + (me.clientX - sX));
+      note.width = Math.max(200, sW + (me.clientX - sX));
       note.height = Math.max(120, sH + (me.clientY - sY));
       el.style.width = `${note.width}px`; el.style.height = `${note.height}px`;
     };
@@ -654,7 +654,7 @@ function resize(el, note, rz) {
 
 // ── Website Text Highlighting ─────────────────────────────────────────────────
 // Save the selection range on right-click (before context menu clears it)
-let lastTarget    = null;
+let lastTarget = null;
 let lastPageRange = null;
 
 document.addEventListener('contextmenu', e => {
@@ -672,8 +672,8 @@ function addHighlight(text) {
   const id = Date.now().toString();
   // Use toolbar color, add opacity (e.g. 50% = 80 in hex) so text is readable
   let color = activeColor;
-  if (color.length === 7) color += '80'; 
-  
+  if (color.length === 7) color += '80';
+
   const hl = { id, url: location.href, text, color };
   highlights.push(hl);
   saveHighlights();
@@ -695,7 +695,7 @@ function applyHighlightRange(range, hl) {
       acceptNode: n => {
         if (!range.intersectsNode(n)) return NodeFilter.FILTER_REJECT;
         const p = n.parentElement;
-        if (p && (['SCRIPT','STYLE','NOSCRIPT'].includes(p.tagName) || p.closest('#webnote-shadow-host'))) return NodeFilter.FILTER_REJECT;
+        if (p && (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(p.tagName) || p.closest('#webnote-shadow-host'))) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     }
@@ -713,7 +713,7 @@ function applyHighlightRange(range, hl) {
     try {
       r.surroundContents(mark);
       mark.onclick = (e) => { e.stopPropagation(); removeHighlight(hl.id); };
-    } catch(e) {}
+    } catch (e) { }
   });
 }
 
@@ -723,7 +723,7 @@ function paintHighlight(hl) {
     acceptNode: n => {
       const p = n.parentElement;
       if (!p) return NodeFilter.FILTER_REJECT;
-      if (['SCRIPT','STYLE','NOSCRIPT'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
+      if (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
       if (p.closest && p.closest('#webnote-shadow-host')) return NodeFilter.FILTER_REJECT;
       if (p.dataset && p.dataset.wn) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
@@ -740,7 +740,7 @@ function paintHighlight(hl) {
       range.surroundContents(mark);
       mark.onclick = () => removeHighlight(hl.id);
       return;
-    } catch(_) {}
+    } catch (_) { }
   }
 }
 
@@ -774,7 +774,7 @@ function toggleSidebar() {
     void sb.offsetWidth; // force reflow
     sb.classList.add('animated');
   }
-  const h  = sb.classList.toggle('hidden');
+  const h = sb.classList.toggle('hidden');
   if (!h) updateSidebarList();
 }
 
@@ -782,15 +782,15 @@ function updateSidebarList(query = '') {
   if (!shadow) return;
   const list = shadow.querySelector('.sb-notes');
   if (!list) return;
-  const q    = query.toLowerCase();
-  const cur  = normUrl(location.href);
+  const q = query.toLowerCase();
+  const cur = normUrl(location.href);
   let visible = notes.filter(n => normUrl(n.url) === cur && (
     !q ||
     n.title.toLowerCase().includes(q) ||
-    n.content.replace(/<[^>]+>/g,'').toLowerCase().includes(q) ||
+    n.content.replace(/<[^>]+>/g, '').toLowerCase().includes(q) ||
     n.tags.some(t => t.toLowerCase().includes(q))
   ));
-  
+
   if (!visible.length) {
     list.innerHTML = `<div class="empty-hint">${q ? 'No results found.' : 'No notes on this page.'}</div>`;
     return;
@@ -798,13 +798,13 @@ function updateSidebarList(query = '') {
 
   // 1. Sort
   if (sidebarSort === 'date-desc') {
-    visible.sort((a,b) => parseInt(b.id) - parseInt(a.id));
+    visible.sort((a, b) => parseInt(b.id) - parseInt(a.id));
   } else if (sidebarSort === 'date-asc') {
-    visible.sort((a,b) => parseInt(a.id) - parseInt(b.id));
+    visible.sort((a, b) => parseInt(a.id) - parseInt(b.id));
   } else if (sidebarSort === 'alpha') {
-    visible.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+    visible.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   } else if (sidebarSort === 'manual') {
-    visible.sort((a,b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    visible.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
   }
 
   // 2. Group
@@ -849,7 +849,7 @@ function updateSidebarList(query = '') {
     groups[gKey].forEach(note => {
       const item = document.createElement('div');
       item.className = 'sb-item';
-      
+
       if (dndEnabled) {
         item.draggable = true;
         item.dataset.nid = note.id;
@@ -874,18 +874,18 @@ function updateSidebarList(query = '') {
         };
       }
 
-      const tags    = note.tags.map(t => `<span class="sb-tag">#${t}</span>`).join(' ');
-      const preview = note.content.replace(/<[^>]+>/g,'').substring(0, 50) || '(empty)';
-      const cbg     = note.color ? `background:${note.color}33;border-left:3px solid ${note.color};` : '';
+      const tags = note.tags.map(t => `<span class="sb-tag">#${t}</span>`).join(' ');
+      const preview = note.content.replace(/<[^>]+>/g, '').substring(0, 50) || '(empty)';
+      const cbg = note.color ? `background:${note.color}33;border-left:3px solid ${note.color};` : '';
       item.innerHTML = `
         <div class="sb-item-actions">
           <div class="sb-item-action edit" title="Edit">${ICONS.pen}</div>
           <div class="sb-item-action del" title="Delete">${ICONS.trash}</div>
         </div>
-        <div class="sb-item-title" style="${cbg}">${note.pinned?ICONS.pinned:ICONS.pin} ${note.title||'Untitled'}</div>
+        <div class="sb-item-title" style="${cbg}">${note.pinned ? ICONS.pinned : ICONS.pin} ${note.title || 'Untitled'}</div>
         ${tags ? `<div class="sb-item-tags">${tags}</div>` : ''}
         <div class="sb-item-preview">${preview}…</div>`;
-      
+
       item.onclick = (e) => {
         if (e.target.closest('.sb-item-action')) return;
         if (note.displayMode !== 'full') {
@@ -941,9 +941,9 @@ function renderPageNotes() {
 function saveNotes() { chrome.storage.local.set({ notes, rules, sidebarSort, sidebarGroup }); }
 
 function updateBadge() {
-  const cur   = normUrl(location.href);
+  const cur = normUrl(location.href);
   const count = notes.filter(n => normUrl(n.url) === cur).length;
-  chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => {});
+  chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => { });
 }
 
 function selector(el) {
@@ -988,7 +988,7 @@ function renderDrawings() {
       el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
       el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
     }
-    
+
     const eraseSelf = () => {
       saveDrawingSnapshot();
       drawings = drawings.filter(x => x.id !== d.id);
@@ -1019,7 +1019,7 @@ function renderDrawings() {
             const parts = initialD.data.split(' ');
             for (let i = 1; i < parts.length; i += 3) {
               if (!isNaN(parts[i])) parts[i] = (parseFloat(initialD.data.split(' ')[i]) + dx).toFixed(1);
-              if (!isNaN(parts[i+1])) parts[i+1] = (parseFloat(initialD.data.split(' ')[i+1]) + dy).toFixed(1);
+              if (!isNaN(parts[i + 1])) parts[i + 1] = (parseFloat(initialD.data.split(' ')[i + 1]) + dy).toFixed(1);
             }
             d.data = parts.join(' ');
             el.setAttribute('d', d.data);
@@ -1056,7 +1056,7 @@ function renderDrawings() {
         window.addEventListener('mouseup', up);
       }
     });
-    
+
     svg.appendChild(el);
 
     // Render Selection & Resize Handles
@@ -1156,7 +1156,7 @@ function setupDrawingBoard(svg, bar) {
       if (b.dataset.tool === toolName) b.classList.add('active');
       else b.classList.remove('active');
     });
-    const needsSurface = ['draw','rect','ellipse','line','eraser'].includes(activeTool);
+    const needsSurface = ['draw', 'rect', 'ellipse', 'line', 'eraser'].includes(activeTool);
     svg.style.pointerEvents = needsSurface ? 'all' : 'none';
     svg.style.userSelect = needsSurface ? 'none' : 'auto';
     svg.style.cursor = (activeTool === 'cursor') ? 'default' : (activeTool === 'highlight' ? 'text' : 'crosshair');
@@ -1192,10 +1192,51 @@ function setupDrawingBoard(svg, bar) {
 
   // Action Buttons
   bar.querySelector('.db-min-icon').onclick = () => {
-    toolbarState.min = false;
+    // 1. Ghost measurement to avoid flicker
+    const ghost = bar.cloneNode(true);
+    ghost.style.visibility = 'hidden';
+    ghost.style.position = 'absolute';
+    ghost.style.pointerEvents = 'none';
+
+    ghost.style.width = '';
+    ghost.style.height = '';
+    ghost.classList.remove('minimized');
+
+    shadow.appendChild(ghost);
+    const w = ghost.offsetWidth;
+    const h = ghost.offsetHeight;
+    shadow.removeChild(ghost);
+
+    // 2. Prepare for expansion: Hold 52px size then remove class
+    bar.style.width = '52px';
+    bar.style.height = '52px';
     bar.classList.remove('minimized');
+
+    void bar.offsetWidth;
+
+    // Trigger CSS transition to target size
+    bar.style.width = `${w}px`;
+    bar.style.height = `${h}px`;
+
+    // 3. Force reflow and wait for next frames to trigger transition
+    // requestAnimationFrame(() => {
+    //   requestAnimationFrame(() => {
+    //     bar.style.width = w + 'px';
+    //     bar.style.height = h + 'px';
+    //   });
+    // });
+
+    // 4. Clean up after animation
+    setTimeout(() => {
+      if (!bar.classList.contains('minimized')) {
+        bar.style.width = ''; bar.style.height = '';
+      }
+    }, 600);
+
+    toolbarState.min = false;
     chrome.storage.local.set({ toolbarState });
   };
+
   bar.querySelector('.db-btn-clear').onclick = () => {
     if (confirm('Do you really want to delete all drawings and highlights on this page?')) {
       saveDrawingSnapshot();
@@ -1207,8 +1248,17 @@ function setupDrawingBoard(svg, bar) {
     }
   };
   bar.querySelector('.db-btn-min').onclick = () => {
+    // 1. Fix current size before minimizing
+    bar.style.width = bar.offsetWidth + 'px';
+    bar.style.height = bar.offsetHeight + 'px';
+    void bar.offsetWidth;
+
+    // 2. Animate to circle
     toolbarState.min = true;
     bar.classList.add('minimized');
+    bar.style.width = '52px';
+    bar.style.height = '52px';
+
     chrome.storage.local.set({ toolbarState });
   };
   bar.querySelector('.db-toggle-dir').onclick = () => {
@@ -1234,22 +1284,22 @@ function setupDrawingBoard(svg, bar) {
   // Toolbar Drag Logic
   const handle = bar.querySelector('.db-drag-handle');
   const minIcon = bar.querySelector('.db-min-icon');
-  
+
   const setupDrag = (dragEl) => {
     let sX, sY, oL, oT;
     dragEl.onmousedown = e => {
       e.preventDefault();
-      sX = e.clientX; sY = e.clientY; 
+      sX = e.clientX; sY = e.clientY;
       oL = bar.offsetLeft; oT = bar.offsetTop;
       const mv = me => {
         const nx = oL + (me.clientX - sX), ny = oT + (me.clientY - sY);
         bar.style.left = `${nx}px`; bar.style.top = `${ny}px`;
         toolbarState.x = nx; toolbarState.y = ny;
       };
-      const up = () => { 
+      const up = () => {
         chrome.storage.local.set({ toolbarState });
-        document.removeEventListener('mousemove', mv); 
-        document.removeEventListener('mouseup', up); 
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
       };
       document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
     };
@@ -1302,8 +1352,8 @@ function setupDrawingBoard(svg, bar) {
       }
       return;
     }
-    
-    if (!['draw','rect','ellipse','line'].includes(activeTool)) return;
+
+    if (!['draw', 'rect', 'ellipse', 'line'].includes(activeTool)) return;
     isDrawing = true;
     startX = e.pageX;
     startY = e.pageY;
@@ -1312,7 +1362,7 @@ function setupDrawingBoard(svg, bar) {
     currentShape.setAttribute('stroke', activeColor);
     currentShape.setAttribute('stroke-width', '4');
     currentShape.setAttribute('fill', (activeTool === 'draw' || activeTool === 'line') ? 'none' : 'transparent');
-    
+
     if (activeTool === 'draw' || activeTool === 'line') {
       currentShape.setAttribute('stroke-linecap', 'round');
       currentShape.setAttribute('stroke-linejoin', 'round');
@@ -1337,7 +1387,7 @@ function setupDrawingBoard(svg, bar) {
     if (!isDrawing || !currentShape) return;
     const cx = e.pageX;
     const cy = e.pageY;
-    
+
     if (activeTool === 'draw') {
       pathData += ` L ${cx} ${cy}`;
       currentShape.setAttribute('d', pathData);
@@ -1366,9 +1416,9 @@ function setupDrawingBoard(svg, bar) {
     if (!isDrawing) return;
     isDrawing = false;
     if (!currentShape) return;
-    
+
     const d = { id: Date.now().toString(), url: location.href, color: activeColor, type: activeTool === 'draw' ? 'path' : activeTool };
-    
+
     if (activeTool === 'draw') {
       if (!pathData.includes('L')) { currentShape.remove(); return; } // just a dot
       d.data = pathData;
@@ -1387,7 +1437,7 @@ function setupDrawingBoard(svg, bar) {
       d.x2 = pts[4]; d.y2 = pts[5];
       if (d.x1 === d.x2 && d.y1 === d.y2) { currentShape.remove(); return; }
     }
-    
+
     currentShape.remove(); // let renderDrawings re-add it with events
     saveDrawingSnapshot();
     drawings.push(d);
@@ -1437,14 +1487,14 @@ function startScreenshotMode() {
   const container = document.querySelector('#webnote-shadow-host');
   if (!container) return;
   const shadow = container.shadowRoot;
-  
+
   const old = shadow.querySelector('.wn-ss-overlay');
   if (old) old.remove();
 
   const overlay = document.createElement('div');
   overlay.className = 'wn-ss-overlay';
   overlay.style.pointerEvents = 'all';
-  let mode = 'crop'; 
+  let mode = 'crop';
   let dest = 'clipboard'; // 'clipboard' or 'download'
 
   overlay.innerHTML = `
@@ -1482,8 +1532,8 @@ function startScreenshotMode() {
   const setMode = (m) => {
     mode = m;
     tools.forEach(t => t.classList.toggle('active', t.dataset.m === m));
-    hint.textContent = m === 'crop' ? 'Select an area with the mouse' : 
-                       m === 'target' ? 'Click on an element' : 'Click for full screen';
+    hint.textContent = m === 'crop' ? 'Select an area with the mouse' :
+      m === 'target' ? 'Click on an element' : 'Click for full screen';
     areaEl.style.display = 'none';
     targetEl.style.display = 'none';
   };
@@ -1599,6 +1649,6 @@ function startScreenshotMode() {
     t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:12px 24px;border-radius:100px;z-index:2147483647;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,0.3);';
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(() => { t.style.opacity='0'; t.style.transition='0.3s'; setTimeout(()=>t.remove(), 300); }, 2000);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = '0.3s'; setTimeout(() => t.remove(), 300); }, 2000);
   }
 }
