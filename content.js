@@ -57,6 +57,7 @@ let toolbarState = { x: null, y: 20, min: false, vert: false, hidden: false };
 
 let undoStack = [];
 let redoStack = [];
+let isEraserDragging = false;
 
 function saveDrawingSnapshot() {
   const cur = normUrl(location.href);
@@ -686,21 +687,34 @@ function addHighlight(text) {
 }
 
 function applyHighlightRange(range, hl) {
-  try {
+  const nodes = [];
+  const walker = document.createTreeWalker(
+    range.commonAncestorContainer,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: n => {
+        if (!range.intersectsNode(n)) return NodeFilter.FILTER_REJECT;
+        const p = n.parentElement;
+        if (p && (['SCRIPT','STYLE','NOSCRIPT'].includes(p.tagName) || p.closest('#webnote-shadow-host'))) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+
+  nodes.forEach(node => {
+    const r = document.createRange();
+    const start = (node === range.startContainer) ? range.startOffset : 0;
+    const end = (node === range.endContainer) ? range.endOffset : node.textContent.length;
+    if (start >= end) return;
+    r.setStart(node, start);
+    r.setEnd(node, end);
     const mark = makeHighlightEl(hl);
     try {
-      range.surroundContents(mark);
-    } catch(_) {
-      // Cross-element: extract then wrap
-      const frag = range.extractContents();
-      mark.appendChild(frag);
-      range.insertNode(mark);
-    }
-    mark.onclick = () => removeHighlight(hl.id);
-  } catch(e) {
-    console.warn('[WebNote] Highlight failed, trying text search:', e);
-    paintHighlight(hl);
-  }
+      r.surroundContents(mark);
+      mark.onclick = (e) => { e.stopPropagation(); removeHighlight(hl.id); };
+    } catch(e) {}
+  });
 }
 
 function paintHighlight(hl) {
@@ -731,12 +745,12 @@ function paintHighlight(hl) {
 }
 
 function makeHighlightEl(hl) {
-  const mark = document.createElement('mark');
-  mark.className = 'webnote-hl';
-  mark.style.cssText = `background:${hl.color}!important;border-radius:2px;cursor:pointer;padding:0 1px;box-decoration-break:clone;`;
-  mark.dataset.wn = hl.id;
-  mark.title = 'WebNote Highlight – Click to remove';
-  return mark;
+  const span = document.createElement('span');
+  span.className = 'webnote-hl';
+  span.style.backgroundColor = hl.color;
+  span.dataset.wn = hl.id;
+  span.title = 'WebNote Highlight – Click to remove';
+  return span;
 }
 
 function removeHighlight(id) {
@@ -975,14 +989,24 @@ function renderDrawings() {
       el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
     }
     
+    const eraseSelf = () => {
+      saveDrawingSnapshot();
+      drawings = drawings.filter(x => x.id !== d.id);
+      saveDrawings();
+      el.remove();
+    };
+
+    el.addEventListener('mouseenter', () => {
+      if (activeTool === 'eraser' && isEraserDragging) {
+        eraseSelf();
+      }
+    });
+
     // Eraser interaction
     el.addEventListener('mousedown', (e) => {
       if (activeTool === 'eraser') {
         e.stopPropagation();
-        saveDrawingSnapshot();
-        drawings = drawings.filter(x => x.id !== d.id);
-        saveDrawings();
-        el.remove();
+        eraseSelf();
       } else if (activeTool === 'cursor') {
         // Drag logic
         e.stopPropagation();
@@ -1134,8 +1158,8 @@ function setupDrawingBoard(svg, bar) {
     });
     const needsSurface = ['draw','rect','ellipse','line','eraser'].includes(activeTool);
     svg.style.pointerEvents = needsSurface ? 'all' : 'none';
-    // Allow shapes to be clickable even if svg is 'none'
-    svg.style.cursor = (activeTool === 'cursor') ? 'default' : 'crosshair';
+    svg.style.userSelect = needsSurface ? 'none' : 'auto';
+    svg.style.cursor = (activeTool === 'cursor') ? 'default' : (activeTool === 'highlight' ? 'text' : 'crosshair');
   };
 
   tools.forEach(btn => {
@@ -1253,6 +1277,7 @@ function setupDrawingBoard(svg, bar) {
 
   svg.addEventListener('mousedown', e => {
     if (activeTool === 'eraser') {
+      isEraserDragging = true;
       svg.style.pointerEvents = 'none';
       const elUnder = document.elementFromPoint(e.clientX, e.clientY);
       svg.style.pointerEvents = 'all';
@@ -1291,6 +1316,16 @@ function setupDrawingBoard(svg, bar) {
   });
 
   svg.addEventListener('mousemove', e => {
+    if (activeTool === 'eraser' && isEraserDragging) {
+      svg.style.pointerEvents = 'none';
+      const elUnder = document.elementFromPoint(e.clientX, e.clientY);
+      svg.style.pointerEvents = 'all';
+      if (elUnder && elUnder.classList.contains('webnote-hl')) {
+        removeHighlight(elUnder.dataset.wn);
+      }
+      return;
+    }
+
     if (!isDrawing || !currentShape) return;
     const cx = e.pageX;
     const cy = e.pageY;
@@ -1319,6 +1354,7 @@ function setupDrawingBoard(svg, bar) {
   });
 
   window.addEventListener('mouseup', () => {
+    isEraserDragging = false;
     if (!isDrawing) return;
     isDrawing = false;
     if (!currentShape) return;
