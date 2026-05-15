@@ -141,6 +141,30 @@ async function init() {
     sidebarGroup = data.sidebarGroup || 'none';
     drawings = data.drawings || [];
     toolbarState = data.toolbarState || { x: null, y: 20, min: false, vert: false, hidden: false };
+    
+    // Auto-show logic
+    const autoShow = data.autoShowFAB !== false;
+    if (!autoShow) {
+      const cur = normUrl(location.href);
+      const hasContent = notes.some(n => normUrl(n.url) === cur) || 
+                         highlights.some(h => normUrl(h.url) === cur) || 
+                         drawings.some(d => normUrl(d.url) === cur);
+      
+      if (!hasContent) {
+        toolbarState.hidden = true;
+      }
+    } else {
+      // If auto-showing on a clean page, we might want to force it minimized
+      const cur = normUrl(location.href);
+      const hasContent = notes.some(n => normUrl(n.url) === cur) || 
+                         highlights.some(h => normUrl(h.url) === cur) || 
+                         drawings.some(d => normUrl(d.url) === cur);
+      if (!hasContent) {
+        toolbarState.min = true; // Force icon mode on fresh pages
+      }
+      toolbarState.hidden = false;
+    }
+
     injectUI();
     renderPageNotes();
     restoreHighlights();
@@ -1464,6 +1488,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     toolbarState.hidden = !toolbarState.hidden;
     chrome.storage.local.set({ toolbarState });
     const bar = shadow?.querySelector('#webnote-drawbar');
+    if (bar) bar.style.display = toolbarState.hidden ? 'none' : 'flex';
+  }
+  if (msg.action === 'AUTO_SHOW_CHANGED') {
+    const autoShow = msg.value;
+    const bar = shadow?.querySelector('#webnote-drawbar');
+    
+    if (!autoShow) {
+      const cur = normUrl(location.href);
+      const hasContent = notes.some(n => normUrl(n.url) === cur) || 
+                         highlights.some(h => normUrl(h.url) === cur) || 
+                         drawings.some(d => normUrl(d.url) === cur);
+      if (!hasContent) {
+        toolbarState.hidden = true;
+      }
+    } else {
+      toolbarState.hidden = false;
+      toolbarState.min = true; // Switch to icon mode when toggling ON
+      if (bar) bar.classList.add('minimized');
+    }
+    
+    chrome.storage.local.set({ toolbarState });
     if (bar) bar.style.display = toolbarState.hidden ? 'none' : 'flex';
   }
   reply({ ok: true });

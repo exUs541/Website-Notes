@@ -74,6 +74,58 @@
       color: #374151;
       border: 1px solid #d1d5db;
     }
+    /* Toggle Switch Styles */
+    .setting-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding: 8px 0;
+      border-top: 1px solid #f3f4f6;
+    }
+    .setting-label {
+      font-size: 13px;
+      color: #374151;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #d1d5db;
+      transition: .3s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #6366f1;
+    }
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
   </style>
 </head>
 <body>
@@ -89,6 +141,13 @@
     <div class="stat-item" style="margin-top: 8px;">
       <span>Total notes:</span>
       <span id="total-count" class="stat-val">0</span>
+    </div>
+    <div class="setting-item">
+      <span class="setting-label">Show Icon on new sites</span>
+      <label class="switch">
+        <input type="checkbox" id="auto-show-fab" checked>
+        <span class="slider"></span>
+      </label>
     </div>
   </div>
   <button id="add-note" class="btn btn-primary">Add Note to Page</button>
