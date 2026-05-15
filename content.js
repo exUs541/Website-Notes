@@ -1180,6 +1180,14 @@ function setupDrawingBoard(svg, bar) {
       saveDrawings();
       renderDrawings();
     }
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      performUndo();
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      performRedo();
+    }
   });
 
   // Action Buttons
