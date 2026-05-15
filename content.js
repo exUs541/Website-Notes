@@ -173,14 +173,20 @@ function updatePinnedPositions() {
 
 // ── UI Shell ──────────────────────────────────────────────────────────────────
 function injectUI() {
-  const ex = document.getElementById('webnote-shadow-host');
-  if (ex) { shadow = ex.shadowRoot; return; }
+  const ex = document.querySelector('#webnote-shadow-host');
+  let host;
+  if (ex) {
+    host = ex;
+    shadow = ex.shadowRoot || ex.attachShadow({ mode: 'open' });
+  } else {
+    host = document.createElement('div');
+    host.id = 'webnote-shadow-host';
+    host.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;pointer-events:none;';
+    document.body.appendChild(host);
+    shadow = host.attachShadow({ mode: 'open' });
+  }
 
-  const host = document.createElement('div');
-  host.id = 'webnote-shadow-host';
-  host.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;pointer-events:none;';
-  document.body.appendChild(host);
-  shadow = host.attachShadow({ mode: 'open' });
+  if (shadow.querySelector('#webnote-drawbar')) return;
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
@@ -951,14 +957,12 @@ function renderDrawings() {
     el.setAttribute('stroke', d.color);
     el.setAttribute('stroke-width', '4');
     el.setAttribute('fill', d.type === 'path' ? 'none' : 'transparent');
+    el.style.pointerEvents = 'all';
     el.dataset.id = d.id;
     if (d.type === 'path') {
       el.setAttribute('stroke-linecap', 'round');
       el.setAttribute('stroke-linejoin', 'round');
       el.setAttribute('d', d.data);
-    } else if (d.type === 'line') {
-      el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
-      el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
     } else if (d.type === 'rect') {
       el.setAttribute('x', d.x); el.setAttribute('y', d.y);
       el.setAttribute('width', d.w); el.setAttribute('height', d.h);
@@ -1128,7 +1132,7 @@ function setupDrawingBoard(svg, bar) {
       if (b.dataset.tool === toolName) b.classList.add('active');
       else b.classList.remove('active');
     });
-    const needsSurface = ['draw','rect','ellipse','line'].includes(activeTool);
+    const needsSurface = ['draw','rect','ellipse','line','eraser'].includes(activeTool);
     svg.style.pointerEvents = needsSurface ? 'all' : 'none';
     // Allow shapes to be clickable even if svg is 'none'
     svg.style.cursor = (activeTool === 'cursor') ? 'default' : 'crosshair';

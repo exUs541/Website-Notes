@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebNote - Demo Simulation</title>
+    <link rel="stylesheet" href="../content.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            height: 200vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .demo-content {
+            max-width: 900px;
+            margin: 120px auto;
+            padding: 60px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 32px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.05);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        h1 { color: #1e293b; font-size: 48px; margin-bottom: 24px; letter-spacing: -0.02em; }
+        p { color: #64748b; font-size: 20px; line-height: 1.6; }
+        .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 50px; }
+        .feature-card { padding: 32px; background: white; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.02); }
+        .feature-card h3 { margin-top: 0; color: #6366f1; font-size: 22px; }
+    </style>
+</head>
+<body>
+    <div class="demo-content">
+        <h1>Experience WebNote v2</h1>
+        <p>This is a live simulation of the WebNote extension. Everything you see—the glassmorphism toolbar, the notes, and the drawings—is powered by our real production code.</p>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>Glassmorphism UI</h3>
+                <p>A stunning, translucent interface that feels alive and integrates perfectly into any website.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Advanced Tools</h3>
+                <p>From precision drawing to element-based screenshots, WebNote is your ultimate research companion.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mocking Chrome Extension APIs
+        window.chrome = {
+            runtime: {
+                getManifest: () => ({ version: "2.0.0" }),
+                getURL: (path) => path,
+                sendMessage: (msg, cb) => {
+                    console.log("Mock Message:", msg);
+                    if (msg.action === 'CAPTURE_VISIBLE') {
+                        cb({ dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" });
+                    }
+                },
+                onMessage: { addListener: () => {} }
+            },
+            storage: {
+                local: {
+                    get: (keys, cb) => {
+                        const res = {};
+                        if (typeof keys === 'string') res[keys] = JSON.parse(localStorage.getItem(keys));
+                        else keys.forEach(k => res[k] = JSON.parse(localStorage.getItem(k)));
+                        if (cb) cb(res);
+                        return Promise.resolve(res);
+                    },
+                    set: (obj, cb) => {
+                        for (let k in obj) localStorage.setItem(k, JSON.stringify(obj[k]));
+                        if (cb) cb();
+                        return Promise.resolve();
+                    }
+                }
+            }
+        };
+
+        // Load content.js script manually
+        const script = document.createElement('script');
+        script.src = '../content.js';
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
