@@ -133,7 +133,7 @@ function migrateNote(note) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const data = await chrome.storage.local.get(['notes', 'highlights', 'rules', 'sidebarSort', 'sidebarGroup', 'drawings', 'toolbarState']);
+    const data = await chrome.storage.local.get(['notes', 'highlights', 'rules', 'sidebarSort', 'sidebarGroup', 'drawings', 'toolbarState', 'autoShowFAB']);
     notes = (data.notes || []).map(migrateNote);
     highlights = data.highlights || [];
     rules = data.rules || { hiddenUrls: [] };
