@@ -19,6 +19,10 @@ const ICONS = {
   line: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 20-20"/></svg>`,
   arrow: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L19 5"/><path d="M19 5v6m0-6H13"/></svg>`,
   blur: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-4.3-7-11-7-11S5 10.7 5 15a7 7 0 0 0 7 7z"/></svg>`,
+  censorGlass: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>`,
+  censorPixel: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="6" height="6" x="4" y="4"/><rect width="6" height="6" x="14" y="4"/><rect width="6" height="6" x="9" y="9"/><rect width="6" height="6" x="4" y="14"/><rect width="6" height="6" x="14" y="14"/></svg>`,
+  censorSolid: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>`,
+  censorAurora: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>`,
   sticker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
   undo: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
   redo: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
@@ -280,7 +284,11 @@ function injectUI() {
           <button class="db-tool" data-tool="ellipse" title="Circle">${ICONS.circle}</button>
           <button class="db-tool" data-tool="line" title="Line">${ICONS.line}</button>
           <button class="db-tool" data-tool="arrow" title="Arrow">${ICONS.arrow}</button>
-          <button class="db-tool" data-tool="blur" title="Blur Area">${ICONS.blur}</button>
+          <div class="db-shape-sep"></div>
+          <button class="db-tool" data-tool="censor-glass" title="Frosted Glass Blur">${ICONS.censorGlass}</button>
+          <button class="db-tool" data-tool="censor-pixel" title="Pixelated Mosaic">${ICONS.censorPixel}</button>
+          <button class="db-tool" data-tool="censor-solid" title="Redacted Blackout">${ICONS.censorSolid}</button>
+          <button class="db-tool" data-tool="censor-aurora" title="Neon Aurora Glow">${ICONS.censorAurora}</button>
         </div>
       </div>
       <div class="db-sep"></div>
@@ -1056,10 +1064,10 @@ function renderDrawings() {
   svg.innerHTML = '';
   const cur = normUrl(location.href);
   drawings.filter(d => normUrl(d.url) === cur).forEach(d => {
-    const tag = d.type === 'arrow' ? 'g' : (d.type === 'sticker' ? 'text' : (d.type === 'blur' ? 'foreignObject' : d.type));
+    const tag = d.type === 'arrow' ? 'g' : (d.type === 'sticker' ? 'text' : (d.type === 'blur' || d.type.startsWith('censor-') ? 'foreignObject' : d.type));
     const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
     
-    if (d.type !== 'sticker' && d.type !== 'blur') {
+    if (d.type !== 'sticker' && d.type !== 'blur' && !d.type.startsWith('censor-')) {
       el.setAttribute('stroke', d.color);
       el.setAttribute('stroke-width', '4');
       el.setAttribute('fill', d.type === 'path' ? 'none' : 'transparent');
@@ -1074,10 +1082,21 @@ function renderDrawings() {
     } else if (d.type === 'rect') {
       el.setAttribute('x', d.x); el.setAttribute('y', d.y);
       el.setAttribute('width', d.w); el.setAttribute('height', d.h);
-    } else if (d.type === 'blur') {
+    } else if (d.type === 'blur' || d.type.startsWith('censor-')) {
       el.setAttribute('x', d.x); el.setAttribute('y', d.y);
       el.setAttribute('width', d.w); el.setAttribute('height', d.h);
-      el.innerHTML = `<div style="width:100%; height:100%; backdrop-filter: blur(25px) contrast(1.15); -webkit-backdrop-filter: blur(25px) contrast(1.15); background-image: repeating-conic-gradient(rgba(0, 0, 0, 0.08) 0% 25%, transparent 0% 50%); background-size: 8px 8px; background-color: rgba(255, 255, 255, 0.15); border: 1.5px dashed rgba(99, 102, 241, 0.45); border-radius: 4px; pointer-events: none;"></div>`;
+      
+      let html = '';
+      if (d.type === 'censor-glass' || d.type === 'blur') {
+        html = `<div style="width:100%; height:100%; backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); background-color: rgba(255, 255, 255, 0.15); border: 1.5px dashed rgba(99, 102, 241, 0.45); border-radius: 4px; pointer-events: none; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);"></div>`;
+      } else if (d.type === 'censor-pixel') {
+        html = `<div style="width:100%; height:100%; backdrop-filter: blur(25px) contrast(1.15); -webkit-backdrop-filter: blur(25px) contrast(1.15); background-image: repeating-conic-gradient(rgba(0, 0, 0, 0.08) 0% 25%, transparent 0% 50%); background-size: 8px 8px; background-color: rgba(255, 255, 255, 0.15); border: 1.5px dashed rgba(99, 102, 241, 0.45); border-radius: 4px; pointer-events: none;"></div>`;
+      } else if (d.type === 'censor-solid') {
+        html = `<div style="width:100%; height:100%; background: #0f172a; border: 1.5px dashed rgba(255, 255, 255, 0.3); border-radius: 4px; pointer-events: none; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 11px; font-weight: bold; color: rgba(255, 255, 255, 0.25); letter-spacing: 2px;">REDACTED</div>`;
+      } else if (d.type === 'censor-aurora') {
+        html = `<div style="width:100%; height:100%; backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(99, 102, 241, 0.4)); border: 1.5px dashed rgba(168, 85, 247, 0.6); border-radius: 4px; pointer-events: none; box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);"></div>`;
+      }
+      el.innerHTML = html;
     } else if (d.type === 'ellipse') {
       el.setAttribute('cx', d.cx); el.setAttribute('cy', d.cy);
       el.setAttribute('rx', d.rx); el.setAttribute('ry', d.ry);
@@ -1154,7 +1173,7 @@ function renderDrawings() {
             }
             d.data = parts.join(' ');
             el.setAttribute('d', d.data);
-          } else if (d.type === 'rect' || d.type === 'blur') {
+          } else if (d.type === 'rect' || d.type === 'blur' || d.type.startsWith('censor-')) {
             d.x = (parseFloat(initialD.x) + dx).toFixed(1);
             d.y = (parseFloat(initialD.y) + dy).toFixed(1);
             el.setAttribute('x', d.x); el.setAttribute('y', d.y);
@@ -1214,7 +1233,7 @@ function renderDrawings() {
     svg.appendChild(el);
 
     // Render Selection & Resize Handles
-    if (activeTool === 'cursor' && d.id === selectedDrawingId && (d.type === 'rect' || d.type === 'ellipse' || d.type === 'blur')) {
+    if (activeTool === 'cursor' && d.id === selectedDrawingId && (d.type === 'rect' || d.type === 'ellipse' || d.type === 'blur' || d.type.startsWith('censor-'))) {
       const handle = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
       handle.setAttribute('fill', '#fff');
       handle.setAttribute('stroke', '#6366f1');
@@ -1224,7 +1243,7 @@ function renderDrawings() {
       handle.style.pointerEvents = 'all';
 
       const updateHandlePos = () => {
-        if (d.type === 'rect' || d.type === 'blur') {
+        if (d.type === 'rect' || d.type === 'blur' || d.type.startsWith('censor-')) {
           handle.setAttribute('cx', parseFloat(d.x) + parseFloat(d.w));
           handle.setAttribute('cy', parseFloat(d.y) + parseFloat(d.h));
         } else if (d.type === 'ellipse') {
@@ -1241,7 +1260,7 @@ function renderDrawings() {
 
         const mv = (me) => {
           const dx = me.pageX - sX, dy = me.pageY - sY;
-          if (d.type === 'rect' || d.type === 'blur') {
+          if (d.type === 'rect' || d.type === 'blur' || d.type.startsWith('censor-')) {
             d.w = Math.max(10, parseFloat(initialD.w) + dx).toFixed(1);
             d.h = Math.max(10, parseFloat(initialD.h) + dy).toFixed(1);
             el.setAttribute('width', d.w); el.setAttribute('height', d.h);
@@ -1365,7 +1384,7 @@ function setupDrawingBoard(svg, bar) {
       if (b.dataset.tool === toolName) b.classList.add('active');
       else b.classList.remove('active');
     });
-    const needsSurface = ['draw', 'rect', 'ellipse', 'line', 'eraser', 'arrow', 'blur'].includes(activeTool) || activeTool.startsWith('sticker-');
+    const needsSurface = ['draw', 'rect', 'ellipse', 'line', 'eraser', 'arrow', 'blur'].includes(activeTool) || activeTool.startsWith('sticker-') || activeTool.startsWith('censor-');
     svg.style.pointerEvents = needsSurface ? 'all' : 'none';
     svg.style.userSelect = needsSurface ? 'none' : 'auto';
     svg.style.cursor = (activeTool === 'cursor') ? 'default' : (activeTool === 'highlight' ? 'text' : 'crosshair');
@@ -1661,17 +1680,17 @@ function setupDrawingBoard(svg, bar) {
       return;
     }
 
-    if (!['draw', 'rect', 'ellipse', 'line', 'arrow', 'blur'].includes(activeTool)) return;
+    if (!['draw', 'rect', 'ellipse', 'line', 'arrow', 'blur'].includes(activeTool) && !activeTool.startsWith('censor-')) return;
     isDrawing = true;
     startX = e.pageX;
     startY = e.pageY;
 
-    if (activeTool === 'blur') {
+    if (activeTool === 'blur' || activeTool.startsWith('censor-')) {
       currentShape = document.createElementNS("http://www.w3.org/2000/svg", 'rect');
       currentShape.setAttribute('stroke', '#6366f1');
       currentShape.setAttribute('stroke-width', '2');
       currentShape.setAttribute('stroke-dasharray', '4 4');
-      currentShape.setAttribute('fill', 'rgba(255, 255, 255, 0.3)');
+      currentShape.setAttribute('fill', 'rgba(99, 102, 241, 0.1)');
     } else {
       currentShape = document.createElementNS("http://www.w3.org/2000/svg", (activeTool === 'draw' || activeTool === 'line' || activeTool === 'arrow') ? 'path' : activeTool);
       currentShape.setAttribute('stroke', activeColor);
@@ -1720,7 +1739,7 @@ function setupDrawingBoard(svg, bar) {
         pathData += ` M ${h1x} ${h1y} L ${cx} ${cy} L ${h2x} ${h2y}`;
       }
       currentShape.setAttribute('d', pathData);
-    } else if (activeTool === 'rect' || activeTool === 'blur') {
+    } else if (activeTool === 'rect' || activeTool === 'blur' || activeTool.startsWith('censor-')) {
       const x = Math.min(startX, cx);
       const y = Math.min(startY, cy);
       const w = Math.abs(cx - startX);
@@ -1748,7 +1767,7 @@ function setupDrawingBoard(svg, bar) {
     if (activeTool === 'draw') {
       if (!pathData.includes('L')) { currentShape.remove(); return; } // just a dot
       d.data = pathData;
-    } else if (activeTool === 'rect' || activeTool === 'blur') {
+    } else if (activeTool === 'rect' || activeTool === 'blur' || activeTool.startsWith('censor-')) {
       d.x = currentShape.getAttribute('x'); d.y = currentShape.getAttribute('y');
       d.w = currentShape.getAttribute('width'); d.h = currentShape.getAttribute('height');
       if (d.w < 5 && d.h < 5) { currentShape.remove(); return; }

@@ -427,7 +427,20 @@
   margin: 0 4px;
 }
 
+.db-shape-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 0 4px;
+}
+
 .webnote-drawbar.vertical .db-sep {
+  width: 20px;
+  height: 1px;
+  margin: 4px 0;
+}
+
+.webnote-drawbar.vertical .db-shape-sep {
   width: 20px;
   height: 1px;
   margin: 4px 0;
