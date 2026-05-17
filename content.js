@@ -1092,7 +1092,7 @@ function renderDrawings() {
       } else if (d.type === 'censor-pixel') {
         html = `<div style="width:100%; height:100%; backdrop-filter: blur(25px) contrast(1.15); -webkit-backdrop-filter: blur(25px) contrast(1.15); background-image: repeating-conic-gradient(rgba(0, 0, 0, 0.08) 0% 25%, transparent 0% 50%); background-size: 8px 8px; background-color: rgba(255, 255, 255, 0.15); border: 1.5px dashed rgba(99, 102, 241, 0.45); border-radius: 4px; pointer-events: none;"></div>`;
       } else if (d.type === 'censor-solid') {
-        html = `<div style="width:100%; height:100%; background: #0f172a; border: 1.5px dashed rgba(255, 255, 255, 0.3); border-radius: 4px; pointer-events: none; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 11px; font-weight: bold; color: rgba(255, 255, 255, 0.25); letter-spacing: 2px;">REDACTED</div>`;
+        html = `<div style="width:100%; height:100%; background: #0f172a; border: 1.5px dashed rgba(255, 255, 255, 0.3); border-radius: 4px; pointer-events: none;"></div>`;
       } else if (d.type === 'censor-aurora') {
         html = `<div style="width:100%; height:100%; backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(99, 102, 241, 0.4)); border: 1.5px dashed rgba(168, 85, 247, 0.6); border-radius: 4px; pointer-events: none; box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);"></div>`;
       }
