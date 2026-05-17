@@ -109,76 +109,67 @@ function startScreenshotMode() {
     }
   });
 
+  // Synchronously converts a dataURL to a Blob without calling fetch()
+  // This completely bypasses webpage CSP constraints on data URIs.
+  function dataURLToBlob(dataURL) {
+    const parts = dataURL.split(';base64,');
+    const contentType = parts[0].split(':')[1];
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+    return new Blob([uInt8Array], { type: contentType });
+  }
+
   function doCapture(x, y, w, h) {
     overlay.remove();
     // Tiny delay to ensure overlay is gone from the screenshot
     setTimeout(() => {
-      chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE' }, (res) => {
+      const isFullscreen = (x === undefined || y === undefined);
+      const dpr = window.devicePixelRatio || 1;
+      
+      const msg = { action: 'CAPTURE_VISIBLE' };
+      if (!isFullscreen) {
+        msg.crop = { x, y, w, h, dpr };
+      }
+
+      chrome.runtime.sendMessage(msg, (res) => {
         if (!res || !res.dataUrl) {
           console.error('[WebNote] Capture failed or no dataUrl');
           return;
         }
 
-        const isFullscreen = (x === undefined || y === undefined);
-
-        if (isFullscreen) {
-          // Full screen: use original working path
-          handleResult(res.dataUrl);
-        } else {
-          // Crop / target: draw onto canvas then get a real Blob
-          const img = new Image();
-          img.onload = () => {
-            const dpr = window.devicePixelRatio || 1;
-            const canvas = document.createElement('canvas');
-            canvas.width = w * dpr; canvas.height = h * dpr;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
-
-            canvas.toBlob(blob => {
-              if (!blob) { console.error('[WebNote] toBlob failed'); return; }
-
-              if (useClipboard) {
-                navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-                  .then(() => showToast('In Zwischenablage kopiert!'))
-                  .catch(err => {
-                    console.error('[WebNote] Clipboard error:', err);
-                    downloadBlob(blob);
-                  });
-              } else {
-                downloadBlob(blob);
-              }
-            }, 'image/png');
-          };
-          img.src = res.dataUrl;
-        }
+        // All captures (fullscreen, crop, element) are now processed 
+        // through the secure background/service worker pipeline.
+        handleResult(res.dataUrl);
       });
     }, 150);
   }
 
   async function handleResult(dataUrl) {
     if (useClipboard) {
+      window.focus();
       try {
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        const item = new ClipboardItem({ 'image/png': blob });
+        const blob = dataURLToBlob(dataUrl);
+        const item = new ClipboardItem({ [blob.type]: blob });
         await navigator.clipboard.write([item]);
         showToast('In Zwischenablage kopiert!');
       } catch (err) {
         console.error('[WebNote] Clipboard error:', err);
-        download(dataUrl);
+        // Fallback: download if copy fails
+        try {
+          const blob = dataURLToBlob(dataUrl);
+          downloadBlob(blob);
+        } catch (_) {}
       }
     } else {
-      download(dataUrl);
+      try {
+        const blob = dataURLToBlob(dataUrl);
+        downloadBlob(blob);
+      } catch (_) {}
     }
-  }
-
-  function download(dataUrl) {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `webnote-ss-${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
   }
 
   function downloadBlob(blob) {

@@ -22,6 +22,19 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (msg) chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
 });
 
+// Helper to convert data URL to Blob in service worker
+function dataURLToBlob(dataURL) {
+  const parts = dataURL.split(';base64,');
+  const contentType = parts[0].split(':')[1];
+  const raw = atob(parts[1]);
+  const rawLength = raw.length;
+  const uInt8Array = new Uint8Array(rawLength);
+  for (let i = 0; i < rawLength; ++i) {
+    uInt8Array[i] = raw.charCodeAt(i);
+  }
+  return new Blob([uInt8Array], { type: contentType });
+}
+
 // ── Messages & Badge ────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'UPDATE_BADGE') {
@@ -34,7 +47,49 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.action === 'CAPTURE_VISIBLE') {
     chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
-      sendResponse({ dataUrl });
+      if (!dataUrl) {
+        sendResponse({ error: 'Failed to capture tab' });
+        return;
+      }
+      
+      if (msg.crop) {
+        (async () => {
+          try {
+            const { x, y, w, h, dpr } = msg.crop;
+            const blob = dataURLToBlob(dataUrl);
+            const bitmap = await createImageBitmap(blob);
+            
+            const rx = Math.round(x * dpr);
+            const ry = Math.round(y * dpr);
+            const rw = Math.round(w * dpr);
+            const rh = Math.round(h * dpr);
+            
+            const canvas = new OffscreenCanvas(rw, rh);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, rx, ry, rw, rh, 0, 0, rw, rh);
+            
+            const croppedBlob = await canvas.convertToBlob({ type: 'image/png' });
+            const arrayBuffer = await croppedBlob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            const len = bytes.byteLength;
+            const chunkSize = 65536;
+            for (let i = 0; i < len; i += chunkSize) {
+              const chunk = bytes.subarray(i, i + chunkSize);
+              binary += String.fromCharCode.apply(null, chunk);
+            }
+            const base64 = btoa(binary);
+            const croppedDataUrl = `data:image/png;base64,${base64}`;
+            
+            sendResponse({ dataUrl: croppedDataUrl });
+          } catch (e) {
+            console.error('[WebNote] Offscreen crop error:', e);
+            sendResponse({ dataUrl }); // Fallback to full screen if crop fails
+          }
+        })();
+      } else {
+        sendResponse({ dataUrl });
+      }
     });
     return true; // async
   }
