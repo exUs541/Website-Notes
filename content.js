@@ -1077,7 +1077,7 @@ function renderDrawings() {
     } else if (d.type === 'blur') {
       el.setAttribute('x', d.x); el.setAttribute('y', d.y);
       el.setAttribute('width', d.w); el.setAttribute('height', d.h);
-      el.innerHTML = `<div style="width:100%; height:100%; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.3); border: 1px dashed rgba(99, 102, 241, 0.3); border-radius: 4px; pointer-events: none;"></div>`;
+      el.innerHTML = `<div style="width:100%; height:100%; backdrop-filter: blur(25px) contrast(1.15); -webkit-backdrop-filter: blur(25px) contrast(1.15); background-image: repeating-conic-gradient(rgba(0, 0, 0, 0.08) 0% 25%, transparent 0% 50%); background-size: 8px 8px; background-color: rgba(255, 255, 255, 0.15); border: 1.5px dashed rgba(99, 102, 241, 0.45); border-radius: 4px; pointer-events: none;"></div>`;
     } else if (d.type === 'ellipse') {
       el.setAttribute('cx', d.cx); el.setAttribute('cy', d.cy);
       el.setAttribute('rx', d.rx); el.setAttribute('ry', d.ry);
