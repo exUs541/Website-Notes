@@ -1101,7 +1101,11 @@ function saveNotes() { chrome.storage.local.set({ notes, rules, sidebarSort, sid
 function updateBadge() {
   const cur = normUrl(location.href);
   const count = notes.filter(n => normUrl(n.url) === cur).length;
-  chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => { });
+  try {
+    chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => { });
+  } catch (e) {
+    console.warn('[WebNote] Context invalidated. Tab reload required.');
+  }
 }
 
 function selector(el) {
@@ -1973,8 +1977,24 @@ function startScreenshotMode() {
 
   let isDragging = false, sX, sY;
 
+  // Synchronously converts a dataURL to a Blob without calling fetch()
+  // This completely bypasses webpage CSP constraints on data URIs.
+  function dataURLToBlob(dataURL) {
+    const parts = dataURL.split(';base64,');
+    const contentType = parts[0].split(':')[1];
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+    return new Blob([uInt8Array], { type: contentType });
+  }
+
   overlay.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.wn-ss-tools')) return;
     if (e.target !== overlay && e.target !== areaEl) return;
+    
     if (mode === 'screen') { doCapture(); return; }
     if (mode === 'target') return;
 
@@ -1990,11 +2010,15 @@ function startScreenshotMode() {
       overlay.style.pointerEvents = 'none';
       const el = document.elementFromPoint(e.clientX, e.clientY);
       overlay.style.pointerEvents = 'all';
-      if (el && el.id !== 'webnote-shadow-host') {
+      
+      // Filter out shadow host, overlay itself, or invalid elements
+      if (el && el.id !== 'webnote-shadow-host' && el !== document.documentElement && el !== document.body) {
         const r = el.getBoundingClientRect();
         targetEl.style.left = r.left + 'px'; targetEl.style.top = r.top + 'px';
         targetEl.style.width = r.width + 'px'; targetEl.style.height = r.height + 'px';
         targetEl.style.display = 'block';
+      } else {
+        targetEl.style.display = 'none';
       }
     }
     if (!isDragging) return;
@@ -2006,13 +2030,18 @@ function startScreenshotMode() {
   });
 
   overlay.addEventListener('mouseup', (e) => {
+    if (e.target.closest('.wn-ss-tools')) return;
+    
     if (mode === 'target') {
       overlay.style.pointerEvents = 'none';
       const el = document.elementFromPoint(e.clientX, e.clientY);
       overlay.style.pointerEvents = 'all';
-      if (el) {
+      
+      if (el && el.id !== 'webnote-shadow-host' && el !== document.documentElement && el !== document.body) {
         const r = el.getBoundingClientRect();
-        doCapture(r.left, r.top, r.width, r.height);
+        if (r.width > 5 && r.height > 5) {
+          doCapture(r.left, r.top, r.width, r.height);
+        }
       }
       return;
     }
@@ -2026,53 +2055,60 @@ function startScreenshotMode() {
 
   function doCapture(x, y, w, h) {
     overlay.remove();
+    // Tiny delay to ensure overlay is gone from the screenshot
     setTimeout(() => {
-      chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE' }, (res) => {
-        if (!res || !res.dataUrl) return;
-        if (!x && !y) {
-          handleResult(res.dataUrl);
-        } else {
-          const img = new Image();
-          img.onload = () => {
-            const dpr = window.devicePixelRatio || 1;
-            const canvas = document.createElement('canvas');
-            canvas.width = w * dpr; canvas.height = h * dpr;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
-            handleResult(canvas.toDataURL('image/png'));
-          };
-          img.src = res.dataUrl;
+      const isFullscreen = (x === undefined || y === undefined);
+      const dpr = window.devicePixelRatio || 1;
+      
+      const msg = { action: 'CAPTURE_VISIBLE' };
+      if (!isFullscreen) {
+        msg.crop = { x, y, w, h, dpr };
+      }
+
+      chrome.runtime.sendMessage(msg, (res) => {
+        if (!res || !res.dataUrl) {
+          console.error('[WebNote] Capture failed or no dataUrl');
+          return;
         }
+
+        handleResult(res.dataUrl);
       });
     }, 150);
   }
 
   async function handleResult(dataUrl) {
     if (dest === 'clipboard') {
+      window.focus();
       try {
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        window.focus(); // Ensure document is focused before clipboard write
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
-        showToast('Copied to clipboard!');
+        const blob = dataURLToBlob(dataUrl);
+        const item = new ClipboardItem({ [blob.type]: blob });
+        await navigator.clipboard.write([item]);
+        showToast('In Zwischenablage kopiert!');
       } catch (err) {
-        console.error('Clipboard error:', err);
-        download(dataUrl);
+        console.error('[WebNote] Clipboard error:', err);
+        // Fallback: download if copy fails
+        try {
+          const blob = dataURLToBlob(dataUrl);
+          downloadBlob(blob);
+        } catch (_) {}
       }
     } else {
-      download(dataUrl);
+      try {
+        const blob = dataURLToBlob(dataUrl);
+        downloadBlob(blob);
+      } catch (_) {}
     }
   }
 
-  function download(dataUrl) {
+  function downloadBlob(blob) {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = dataUrl;
+    a.href = url;
     a.download = `webnote-ss-${Date.now()}.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
   function showToast(msg) {
