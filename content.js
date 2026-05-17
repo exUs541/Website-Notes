@@ -17,6 +17,9 @@ const ICONS = {
   rect: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>`,
   circle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`,
   line: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 20-20"/></svg>`,
+  arrow: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L19 5"/><path d="M19 5v6m0-6H13"/></svg>`,
+  blur: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-4.3-7-11-7-11S5 10.7 5 15a7 7 0 0 0 7 7z"/></svg>`,
+  sticker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
   undo: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
   redo: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
   eraser: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.4 5.4c1 1 1 2.5 0 3.4L17 17"/><path d="m22 21H7"/><path d="m5 11 9 9"/></svg>`,
@@ -276,6 +279,22 @@ function injectUI() {
           <button class="db-tool" data-tool="rect" title="Rectangle">${ICONS.rect}</button>
           <button class="db-tool" data-tool="ellipse" title="Circle">${ICONS.circle}</button>
           <button class="db-tool" data-tool="line" title="Line">${ICONS.line}</button>
+          <button class="db-tool" data-tool="arrow" title="Arrow">${ICONS.arrow}</button>
+          <button class="db-tool" data-tool="blur" title="Blur Area">${ICONS.blur}</button>
+        </div>
+      </div>
+      <div class="db-sep"></div>
+      <div class="db-group-wrap">
+        <button class="db-tool has-submenu" id="db-sticker-menu" data-tool="sticker-star" title="Stickers">${ICONS.sticker}</button>
+        <div class="db-sub-menu hidden" id="db-sticker-popup" style="padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 140px;">
+          <button class="db-tool" data-tool="sticker-star" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Star">⭐</button>
+          <button class="db-tool" data-tool="sticker-thumb" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Thumbs Up">👍</button>
+          <button class="db-tool" data-tool="sticker-heart" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Heart">❤️</button>
+          <button class="db-tool" data-tool="sticker-check" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Checkmark">✅</button>
+          <button class="db-tool" data-tool="sticker-cross" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Cross">❌</button>
+          <button class="db-tool" data-tool="sticker-warn" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Warning">⚠️</button>
+          <button class="db-tool" data-tool="sticker-idea" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Idea">💡</button>
+          <button class="db-tool" data-tool="sticker-rocket" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Rocket">🚀</button>
         </div>
       </div>
       <div class="db-sep"></div>
@@ -1037,12 +1056,17 @@ function renderDrawings() {
   svg.innerHTML = '';
   const cur = normUrl(location.href);
   drawings.filter(d => normUrl(d.url) === cur).forEach(d => {
-    const el = document.createElementNS("http://www.w3.org/2000/svg", d.type);
-    el.setAttribute('stroke', d.color);
-    el.setAttribute('stroke-width', '4');
-    el.setAttribute('fill', d.type === 'path' ? 'none' : 'transparent');
+    const tag = d.type === 'arrow' ? 'g' : (d.type === 'sticker' ? 'text' : (d.type === 'blur' ? 'foreignObject' : d.type));
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    
+    if (d.type !== 'sticker' && d.type !== 'blur') {
+      el.setAttribute('stroke', d.color);
+      el.setAttribute('stroke-width', '4');
+      el.setAttribute('fill', d.type === 'path' ? 'none' : 'transparent');
+    }
     el.style.pointerEvents = 'all';
     el.dataset.id = d.id;
+
     if (d.type === 'path') {
       el.setAttribute('stroke-linecap', 'round');
       el.setAttribute('stroke-linejoin', 'round');
@@ -1050,6 +1074,10 @@ function renderDrawings() {
     } else if (d.type === 'rect') {
       el.setAttribute('x', d.x); el.setAttribute('y', d.y);
       el.setAttribute('width', d.w); el.setAttribute('height', d.h);
+    } else if (d.type === 'blur') {
+      el.setAttribute('x', d.x); el.setAttribute('y', d.y);
+      el.setAttribute('width', d.w); el.setAttribute('height', d.h);
+      el.innerHTML = `<div style="width:100%; height:100%; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.3); border: 1px dashed rgba(99, 102, 241, 0.3); border-radius: 4px; pointer-events: none;"></div>`;
     } else if (d.type === 'ellipse') {
       el.setAttribute('cx', d.cx); el.setAttribute('cy', d.cy);
       el.setAttribute('rx', d.rx); el.setAttribute('ry', d.ry);
@@ -1057,6 +1085,39 @@ function renderDrawings() {
       el.setAttribute('stroke-linecap', 'round');
       el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
       el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
+    } else if (d.type === 'sticker') {
+      el.textContent = d.text;
+      el.setAttribute('x', d.x); el.setAttribute('y', d.y);
+      el.setAttribute('font-size', d.size || '36');
+      el.setAttribute('text-anchor', 'middle');
+      el.setAttribute('dominant-baseline', 'middle');
+      el.style.userSelect = 'none';
+    } else if (d.type === 'arrow') {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", 'line');
+      line.setAttribute('x1', d.x1); line.setAttribute('y1', d.y1);
+      line.setAttribute('x2', d.x2); line.setAttribute('y2', d.y2);
+      line.setAttribute('stroke-linecap', 'round');
+      
+      const head = document.createElementNS("http://www.w3.org/2000/svg", 'path');
+      head.setAttribute('stroke-linecap', 'round');
+      head.setAttribute('stroke-linejoin', 'round');
+      head.setAttribute('fill', 'none');
+      
+      const updateArrowPath = () => {
+        const x1 = parseFloat(d.x1), y1 = parseFloat(d.y1);
+        const x2 = parseFloat(d.x2), y2 = parseFloat(d.y2);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const L = 15;
+        const alpha = 0.5;
+        const h1x = x2 + L * Math.cos(angle + Math.PI - alpha);
+        const h1y = y2 + L * Math.sin(angle + Math.PI - alpha);
+        const h2x = x2 + L * Math.cos(angle + Math.PI + alpha);
+        const h2y = y2 + L * Math.sin(angle + Math.PI + alpha);
+        head.setAttribute('d', `M ${h1x} ${h1y} L ${x2} ${y2} L ${h2x} ${h2y}`);
+      };
+      updateArrowPath();
+      el.appendChild(line);
+      el.appendChild(head);
     }
 
     const eraseSelf = () => {
@@ -1093,7 +1154,7 @@ function renderDrawings() {
             }
             d.data = parts.join(' ');
             el.setAttribute('d', d.data);
-          } else if (d.type === 'rect') {
+          } else if (d.type === 'rect' || d.type === 'blur') {
             d.x = (parseFloat(initialD.x) + dx).toFixed(1);
             d.y = (parseFloat(initialD.y) + dy).toFixed(1);
             el.setAttribute('x', d.x); el.setAttribute('y', d.y);
@@ -1101,13 +1162,36 @@ function renderDrawings() {
             d.cx = (parseFloat(initialD.cx) + dx).toFixed(1);
             d.cy = (parseFloat(initialD.cy) + dy).toFixed(1);
             el.setAttribute('cx', d.cx); el.setAttribute('cy', d.cy);
-          } else if (d.type === 'line') {
+          } else if (d.type === 'sticker') {
+            d.x = (parseFloat(initialD.x) + dx).toFixed(1);
+            d.y = (parseFloat(initialD.y) + dy).toFixed(1);
+            el.setAttribute('x', d.x); el.setAttribute('y', d.y);
+          } else if (d.type === 'line' || d.type === 'arrow') {
             d.x1 = (parseFloat(initialD.x1) + dx).toFixed(1);
             d.y1 = (parseFloat(initialD.y1) + dy).toFixed(1);
             d.x2 = (parseFloat(initialD.x2) + dx).toFixed(1);
             d.y2 = (parseFloat(initialD.y2) + dy).toFixed(1);
-            el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
-            el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
+            if (d.type === 'line') {
+              el.setAttribute('x1', d.x1); el.setAttribute('y1', d.y1);
+              el.setAttribute('x2', d.x2); el.setAttribute('y2', d.y2);
+            } else {
+              el.childNodes[0].setAttribute('x1', d.x1);
+              el.childNodes[0].setAttribute('y1', d.y1);
+              el.childNodes[0].setAttribute('x2', d.x2);
+              el.childNodes[0].setAttribute('y2', d.y2);
+              
+              // Recalculate arrowhead path
+              const x1 = parseFloat(d.x1), y1 = parseFloat(d.y1);
+              const x2 = parseFloat(d.x2), y2 = parseFloat(d.y2);
+              const angle = Math.atan2(y2 - y1, x2 - x1);
+              const L = 15;
+              const alpha = 0.5;
+              const h1x = x2 + L * Math.cos(angle + Math.PI - alpha);
+              const h1y = y2 + L * Math.sin(angle + Math.PI - alpha);
+              const h2x = x2 + L * Math.cos(angle + Math.PI + alpha);
+              const h2y = y2 + L * Math.sin(angle + Math.PI + alpha);
+              el.childNodes[1].setAttribute('d', `M ${h1x} ${h1y} L ${x2} ${y2} L ${h2x} ${h2y}`);
+            }
           }
         };
 
@@ -1130,7 +1214,7 @@ function renderDrawings() {
     svg.appendChild(el);
 
     // Render Selection & Resize Handles
-    if (activeTool === 'cursor' && d.id === selectedDrawingId && (d.type === 'rect' || d.type === 'ellipse')) {
+    if (activeTool === 'cursor' && d.id === selectedDrawingId && (d.type === 'rect' || d.type === 'ellipse' || d.type === 'blur')) {
       const handle = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
       handle.setAttribute('fill', '#fff');
       handle.setAttribute('stroke', '#6366f1');
@@ -1140,7 +1224,7 @@ function renderDrawings() {
       handle.style.pointerEvents = 'all';
 
       const updateHandlePos = () => {
-        if (d.type === 'rect') {
+        if (d.type === 'rect' || d.type === 'blur') {
           handle.setAttribute('cx', parseFloat(d.x) + parseFloat(d.w));
           handle.setAttribute('cy', parseFloat(d.y) + parseFloat(d.h));
         } else if (d.type === 'ellipse') {
@@ -1157,7 +1241,7 @@ function renderDrawings() {
 
         const mv = (me) => {
           const dx = me.pageX - sX, dy = me.pageY - sY;
-          if (d.type === 'rect') {
+          if (d.type === 'rect' || d.type === 'blur') {
             d.w = Math.max(10, parseFloat(initialD.w) + dx).toFixed(1);
             d.h = Math.max(10, parseFloat(initialD.h) + dy).toFixed(1);
             el.setAttribute('width', d.w); el.setAttribute('height', d.h);
@@ -1180,8 +1264,47 @@ function renderDrawings() {
       svg.appendChild(handle);
     }
 
-    // Line Endpoint Handles
-    if (activeTool === 'cursor' && d.id === selectedDrawingId && d.type === 'line') {
+    // Sticker Font-Size Resize Handle
+    if (activeTool === 'cursor' && d.id === selectedDrawingId && d.type === 'sticker') {
+      const handle = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+      handle.setAttribute('fill', '#fff');
+      handle.setAttribute('stroke', '#6366f1');
+      handle.setAttribute('stroke-width', '2');
+      handle.setAttribute('r', '6');
+      handle.style.cursor = 'nwse-resize';
+      handle.style.pointerEvents = 'all';
+
+      const updateHandlePos = () => {
+        handle.setAttribute('cx', parseFloat(d.x) + parseFloat(d.size || 36) / 2);
+        handle.setAttribute('cy', parseFloat(d.y) + parseFloat(d.size || 36) / 2);
+      };
+      updateHandlePos();
+
+      handle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        let sX = e.pageX, sY = e.pageY;
+        const initialSize = parseFloat(d.size || 36);
+
+        const mv = (me) => {
+          const dx = me.pageX - sX;
+          d.size = Math.max(16, Math.min(120, initialSize + dx * 2)).toFixed(1);
+          el.setAttribute('font-size', d.size);
+          updateHandlePos();
+        };
+
+        const up = () => {
+          saveDrawings();
+          window.removeEventListener('mousemove', mv);
+          window.removeEventListener('mouseup', up);
+        };
+        window.addEventListener('mousemove', mv);
+        window.addEventListener('mouseup', up);
+      });
+      svg.appendChild(handle);
+    }
+
+    // Line & Arrow Endpoint Handles
+    if (activeTool === 'cursor' && d.id === selectedDrawingId && (d.type === 'line' || d.type === 'arrow')) {
       [1, 2].forEach(i => {
         const h = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
         h.setAttribute('fill', '#fff'); h.setAttribute('stroke', '#6366f1'); h.setAttribute('stroke-width', '2'); h.setAttribute('r', '6');
@@ -1196,7 +1319,23 @@ function renderDrawings() {
             d[`x${i}`] = (initValX + (me.pageX - sX)).toFixed(1);
             d[`y${i}`] = (initValY + (me.pageY - sY)).toFixed(1);
             h.setAttribute('cx', d[`x${i}`]); h.setAttribute('cy', d[`y${i}`]);
-            el.setAttribute(`x${i}`, d[`x${i}`]); el.setAttribute(`y${i}`, d[`y${i}`]);
+            if (d.type === 'line') {
+              el.setAttribute(`x${i}`, d[`x${i}`]); el.setAttribute(`y${i}`, d[`y${i}`]);
+            } else {
+              el.childNodes[0].setAttribute(`x${i}`, d[`x${i}`]); el.childNodes[0].setAttribute(`y${i}`, d[`y${i}`]);
+              
+              // Recalculate arrowhead path
+              const x1 = parseFloat(d.x1), y1 = parseFloat(d.y1);
+              const x2 = parseFloat(d.x2), y2 = parseFloat(d.y2);
+              const angle = Math.atan2(y2 - y1, x2 - x1);
+              const L = 15;
+              const alpha = 0.5;
+              const h1x = x2 + L * Math.cos(angle + Math.PI - alpha);
+              const h1y = y2 + L * Math.sin(angle + Math.PI - alpha);
+              const h2x = x2 + L * Math.cos(angle + Math.PI + alpha);
+              const h2y = y2 + L * Math.sin(angle + Math.PI + alpha);
+              el.childNodes[1].setAttribute('d', `M ${h1x} ${h1y} L ${x2} ${y2} L ${h2x} ${h2y}`);
+            }
           };
           const up = () => { saveDrawings(); window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
           window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
@@ -1226,7 +1365,7 @@ function setupDrawingBoard(svg, bar) {
       if (b.dataset.tool === toolName) b.classList.add('active');
       else b.classList.remove('active');
     });
-    const needsSurface = ['draw', 'rect', 'ellipse', 'line', 'eraser'].includes(activeTool);
+    const needsSurface = ['draw', 'rect', 'ellipse', 'line', 'eraser', 'arrow', 'blur'].includes(activeTool) || activeTool.startsWith('sticker-');
     svg.style.pointerEvents = needsSurface ? 'all' : 'none';
     svg.style.userSelect = needsSurface ? 'none' : 'auto';
     svg.style.cursor = (activeTool === 'cursor') ? 'default' : (activeTool === 'highlight' ? 'text' : 'crosshair');
@@ -1365,23 +1504,35 @@ function setupDrawingBoard(svg, bar) {
   // Submenu logic
   const shapeMenuBtn = bar.querySelector('#db-shape-menu');
   const shapePopup = bar.querySelector('#db-shape-popup');
+  const stickerMenuBtn = bar.querySelector('#db-sticker-menu');
+  const stickerPopup = bar.querySelector('#db-sticker-popup');
   const colorMenuBtn = bar.querySelector('#db-color-menu');
   const colorPopup = bar.querySelector('#db-color-popup');
 
   if (shapeMenuBtn) shapeMenuBtn.onclick = (e) => {
     e.stopPropagation();
     colorPopup.classList.add('hidden');
+    if (stickerPopup) stickerPopup.classList.add('hidden');
     shapePopup.classList.toggle('hidden');
     setTool(shapeMenuBtn.dataset.tool);
+  };
+  if (stickerMenuBtn) stickerMenuBtn.onclick = (e) => {
+    e.stopPropagation();
+    colorPopup.classList.add('hidden');
+    shapePopup.classList.add('hidden');
+    stickerPopup.classList.toggle('hidden');
+    setTool(stickerMenuBtn.dataset.tool);
   };
   if (colorMenuBtn) colorMenuBtn.onclick = (e) => {
     e.stopPropagation();
     shapePopup.classList.add('hidden');
+    if (stickerPopup) stickerPopup.classList.add('hidden');
     colorPopup.classList.toggle('hidden');
   };
   
   shadow.addEventListener('click', () => {
     if (shapePopup) shapePopup.classList.add('hidden');
+    if (stickerPopup) stickerPopup.classList.add('hidden');
     if (colorPopup) colorPopup.classList.add('hidden');
   });
 
@@ -1391,6 +1542,15 @@ function setupDrawingBoard(svg, bar) {
       shapeMenuBtn.dataset.tool = btn.dataset.tool;
     });
   });
+
+  if (stickerPopup) {
+    bar.querySelectorAll('#db-sticker-popup .db-tool').forEach(btn => {
+      btn.addEventListener('click', () => {
+        stickerMenuBtn.innerHTML = btn.innerHTML;
+        stickerMenuBtn.dataset.tool = btn.dataset.tool;
+      });
+    });
+  }
 
   // Toolbar Drag Logic
   const handle = bar.querySelector('.db-drag-handle');
@@ -1472,21 +1632,58 @@ function setupDrawingBoard(svg, bar) {
       return;
     }
 
-    if (!['draw', 'rect', 'ellipse', 'line'].includes(activeTool)) return;
+    if (activeTool.startsWith('sticker-')) {
+      const emojiMap = {
+        'sticker-star': '⭐',
+        'sticker-thumb': '👍',
+        'sticker-heart': '❤️',
+        'sticker-check': '✅',
+        'sticker-cross': '❌',
+        'sticker-warn': '⚠️',
+        'sticker-idea': '💡',
+        'sticker-rocket': '🚀'
+      };
+      const emoji = emojiMap[activeTool] || '⭐';
+      saveDrawingSnapshot();
+      const d = {
+        id: Date.now().toString(),
+        url: location.href,
+        type: 'sticker',
+        text: emoji,
+        x: e.pageX.toFixed(1),
+        y: e.pageY.toFixed(1),
+        size: 36
+      };
+      drawings.push(d);
+      saveDrawings();
+      selectedDrawingId = d.id;
+      renderDrawings();
+      return;
+    }
+
+    if (!['draw', 'rect', 'ellipse', 'line', 'arrow', 'blur'].includes(activeTool)) return;
     isDrawing = true;
     startX = e.pageX;
     startY = e.pageY;
 
-    currentShape = document.createElementNS("http://www.w3.org/2000/svg", (activeTool === 'draw' || activeTool === 'line') ? 'path' : activeTool);
-    currentShape.setAttribute('stroke', activeColor);
-    currentShape.setAttribute('stroke-width', '4');
-    currentShape.setAttribute('fill', (activeTool === 'draw' || activeTool === 'line') ? 'none' : 'transparent');
+    if (activeTool === 'blur') {
+      currentShape = document.createElementNS("http://www.w3.org/2000/svg", 'rect');
+      currentShape.setAttribute('stroke', '#6366f1');
+      currentShape.setAttribute('stroke-width', '2');
+      currentShape.setAttribute('stroke-dasharray', '4 4');
+      currentShape.setAttribute('fill', 'rgba(255, 255, 255, 0.3)');
+    } else {
+      currentShape = document.createElementNS("http://www.w3.org/2000/svg", (activeTool === 'draw' || activeTool === 'line' || activeTool === 'arrow') ? 'path' : activeTool);
+      currentShape.setAttribute('stroke', activeColor);
+      currentShape.setAttribute('stroke-width', '4');
+      currentShape.setAttribute('fill', (activeTool === 'draw' || activeTool === 'line' || activeTool === 'arrow') ? 'none' : 'transparent');
+    }
 
-    if (activeTool === 'draw' || activeTool === 'line') {
+    if (activeTool === 'draw' || activeTool === 'line' || activeTool === 'arrow') {
       currentShape.setAttribute('stroke-linecap', 'round');
       currentShape.setAttribute('stroke-linejoin', 'round');
       pathData = `M ${startX} ${startY}`;
-      if (activeTool === 'line') pathData += ` L ${startX} ${startY}`;
+      if (activeTool === 'line' || activeTool === 'arrow') pathData += ` L ${startX} ${startY}`;
       currentShape.setAttribute('d', pathData);
     }
     svg.appendChild(currentShape);
@@ -1510,10 +1707,20 @@ function setupDrawingBoard(svg, bar) {
     if (activeTool === 'draw') {
       pathData += ` L ${cx} ${cy}`;
       currentShape.setAttribute('d', pathData);
-    } else if (activeTool === 'line') {
+    } else if (activeTool === 'line' || activeTool === 'arrow') {
       pathData = `M ${startX} ${startY} L ${cx} ${cy}`;
+      if (activeTool === 'arrow') {
+        const angle = Math.atan2(cy - startY, cx - startX);
+        const L = 15;
+        const alpha = 0.5;
+        const h1x = cx + L * Math.cos(angle + Math.PI - alpha);
+        const h1y = cy + L * Math.sin(angle + Math.PI - alpha);
+        const h2x = cx + L * Math.cos(angle + Math.PI + alpha);
+        const h2y = cy + L * Math.sin(angle + Math.PI + alpha);
+        pathData += ` M ${h1x} ${h1y} L ${cx} ${cy} L ${h2x} ${h2y}`;
+      }
       currentShape.setAttribute('d', pathData);
-    } else if (activeTool === 'rect') {
+    } else if (activeTool === 'rect' || activeTool === 'blur') {
       const x = Math.min(startX, cx);
       const y = Math.min(startY, cy);
       const w = Math.abs(cx - startX);
@@ -1541,7 +1748,7 @@ function setupDrawingBoard(svg, bar) {
     if (activeTool === 'draw') {
       if (!pathData.includes('L')) { currentShape.remove(); return; } // just a dot
       d.data = pathData;
-    } else if (activeTool === 'rect') {
+    } else if (activeTool === 'rect' || activeTool === 'blur') {
       d.x = currentShape.getAttribute('x'); d.y = currentShape.getAttribute('y');
       d.w = currentShape.getAttribute('width'); d.h = currentShape.getAttribute('height');
       if (d.w < 5 && d.h < 5) { currentShape.remove(); return; }
@@ -1549,8 +1756,8 @@ function setupDrawingBoard(svg, bar) {
       d.cx = currentShape.getAttribute('cx'); d.cy = currentShape.getAttribute('cy');
       d.rx = currentShape.getAttribute('rx'); d.ry = currentShape.getAttribute('ry');
       if (d.rx < 5 && d.ry < 5) { currentShape.remove(); return; }
-    } else if (activeTool === 'line') {
-      d.type = 'line';
+    } else if (activeTool === 'line' || activeTool === 'arrow') {
+      d.type = activeTool;
       const pts = pathData.split(' ');
       d.x1 = pts[1]; d.y1 = pts[2];
       d.x2 = pts[4]; d.y2 = pts[5];
