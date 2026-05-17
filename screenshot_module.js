@@ -172,17 +172,18 @@ function startScreenshotMode() {
     }, 150);
   }
 
-  function handleResult(dataUrl) {
+  async function handleResult(dataUrl) {
     if (useClipboard) {
-      // Use Promise<Blob> so clipboard.write() is called immediately (preserving
-      // user-activation), while the actual blob conversion happens asynchronously.
-      const blobPromise = fetch(dataUrl).then(r => r.blob());
-      navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })])
-        .then(() => showToast('In Zwischenablage kopiert!'))
-        .catch(err => {
-          console.error('[WebNote] Clipboard error:', err);
-          download(dataUrl);
-        });
+      try {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const item = new ClipboardItem({ 'image/png': blob });
+        await navigator.clipboard.write([item]);
+        showToast('In Zwischenablage kopiert!');
+      } catch (err) {
+        console.error('[WebNote] Clipboard error:', err);
+        download(dataUrl);
+      }
     } else {
       download(dataUrl);
     }
