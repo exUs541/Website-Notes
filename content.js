@@ -463,7 +463,7 @@ function noteHTML(note) {
 
 function applyStyle(el, note) {
   el.className = ['webnote-sticky', `m-${note.displayMode}`, note.pinned ? 'pinned' : ''].filter(Boolean).join(' ');
-  el.style.background = note.displayMode === 'icon' ? '' : (note.color || '');
+  el.style.background = note.color || '';
   // Update float icon tooltip when title changes
   const floatIcon = el.querySelector('.note-float-icon');
   if (floatIcon) floatIcon.setAttribute('data-title', note.title || 'Untitled');
