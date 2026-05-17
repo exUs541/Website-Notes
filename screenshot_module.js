@@ -111,16 +111,52 @@ function startScreenshotMode() {
 
   function doCapture(x, y, w, h) {
     overlay.remove();
-    // Tiny delay to ensure overlay is gone
+    // Tiny delay to ensure overlay is gone from the screenshot
     setTimeout(() => {
       chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE' }, (res) => {
         if (!res || !res.dataUrl) {
-          console.error('Capture failed or no dataUrl');
+          console.error('[WebNote] Capture failed or no dataUrl');
           return;
         }
-        if (!x && !y) {
+
+        const isFullscreen = (x === undefined || y === undefined);
+
+        if (isFullscreen) {
+          // Full screen: dataUrl is ready immediately
           handleResult(res.dataUrl);
+        } else if (useClipboard) {
+          // Crop / target + clipboard:
+          // Pass a Promise<Blob> to ClipboardItem so user-activation is
+          // preserved across the async img.onload boundary.
+          const blobPromise = new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              try {
+                const dpr = window.devicePixelRatio || 1;
+                const canvas = document.createElement('canvas');
+                canvas.width = w * dpr; canvas.height = h * dpr;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
+                canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('toBlob failed')), 'image/png');
+              } catch (e) { reject(e); }
+            };
+            img.onerror = reject;
+            img.src = res.dataUrl;
+          });
+
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })])
+            .then(() => showToast('In Zwischenablage kopiert!'))
+            .catch(err => {
+              console.error('[WebNote] Clipboard error:', err);
+              // Fallback: decode image and download
+              blobPromise.then(blob => {
+                const url = URL.createObjectURL(blob);
+                download(url);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+              });
+            });
         } else {
+          // Crop / target + download
           const img = new Image();
           img.onload = () => {
             const dpr = window.devicePixelRatio || 1;
