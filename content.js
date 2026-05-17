@@ -221,11 +221,12 @@ function injectUI() {
   let host;
   if (ex) {
     host = ex;
+    host.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
     shadow = ex.shadowRoot || ex.attachShadow({ mode: 'open' });
   } else {
     host = document.createElement('div');
     host.id = 'webnote-shadow-host';
-    host.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;pointer-events:none;';
+    host.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
     document.body.appendChild(host);
     shadow = host.attachShadow({ mode: 'open' });
   }
@@ -1362,8 +1363,15 @@ function renderDrawings() {
 function setupDrawingBoard(svg, bar) {
   // Update SVG size
   const updateSvgSize = () => {
-    svg.style.width = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth) + 'px';
-    svg.style.height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 'px';
+    const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth) + 'px';
+    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 'px';
+    svg.style.width = w;
+    svg.style.height = h;
+    const host = document.querySelector('#webnote-shadow-host');
+    if (host) {
+      host.style.width = w;
+      host.style.height = h;
+    }
   };
   window.addEventListener('resize', updateSvgSize);
   new MutationObserver(updateSvgSize).observe(document.body, { childList: true, subtree: true });
