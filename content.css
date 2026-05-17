@@ -295,7 +295,6 @@
     box-shadow 0.5s ease;
   display: flex;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
 .webnote-drawbar.vertical {
@@ -364,6 +363,63 @@
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
+.db-tool.has-submenu::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 3.5px solid currentColor;
+  opacity: 0.6;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.db-tool.has-submenu.active::after {
+  border-top-color: white;
+  opacity: 1;
+}
+
+.db-tool.has-submenu:hover::after {
+  opacity: 1;
+  transform: translateY(0.5px);
+}
+
+.db-group-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.db-sub-menu {
+  position: absolute;
+  top: 110%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  z-index: 2147483647;
+  border: 1px solid var(--border-glass);
+}
+
+.webnote-drawbar.vertical .db-sub-menu {
+  top: 50%;
+  left: 110%;
+  transform: translateY(-50%);
+  flex-direction: column;
+}
+
+.db-sub-menu.hidden {
+  display: none !important;
+}
+
 .db-sep {
   width: 1px;
   height: 20px;
@@ -380,12 +436,10 @@
 .db-colors {
   display: flex;
   gap: 6px;
-  padding: 0 6px;
 }
 
 .webnote-drawbar.vertical .db-colors {
   flex-direction: column;
-  padding: 6px 0;
 }
 
 .db-color {
@@ -564,6 +618,7 @@
 /* ── Minimized State ───────────────────────────────────────────────────────── */
 .webnote-drawbar.minimized {
   border-radius: 50%;
+  overflow: hidden;
   /* Minimized state (Collapsing): Dimensions first, then Border-radius */
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
     height 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,

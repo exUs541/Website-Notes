@@ -1,5 +1,8 @@
 // content.js - WebNote v3.1
-'use strict';
+(() => {
+  'use strict';
+  if (window.hasWebNoteInjected) return;
+  window.hasWebNoteInjected = true;
 
 const ICONS = {
   drag: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>`,
@@ -144,6 +147,8 @@ async function init() {
     
     // Auto-show logic
     const autoShow = data.autoShowFAB !== false;
+    let stateChanged = false;
+
     if (!autoShow) {
       const cur = normUrl(location.href);
       const hasContent = notes.some(n => normUrl(n.url) === cur) || 
@@ -152,6 +157,7 @@ async function init() {
       
       if (!hasContent) {
         toolbarState.hidden = true;
+        stateChanged = true;
       }
     } else {
       // If auto-showing on a clean page, we might want to force it minimized
@@ -162,7 +168,13 @@ async function init() {
       if (!hasContent) {
         toolbarState.min = true; // Force icon mode on fresh pages
       }
-      toolbarState.hidden = false;
+      if (toolbarState.hidden) {
+        toolbarState.hidden = false;
+        stateChanged = true;
+      }
+    }
+    if (stateChanged) {
+      chrome.storage.local.set({ toolbarState });
     }
 
     injectUI();
@@ -231,6 +243,12 @@ function injectUI() {
   drawBar.className = `webnote-drawbar ${toolbarState.vert ? 'vertical' : ''} ${toolbarState.min ? 'minimized' : ''}`;
   drawBar.style.pointerEvents = 'all';
   if (toolbarState.x !== null && toolbarState.y !== null) {
+    // Ensure icon stays within visible bounds
+    const maxW = Math.max(0, window.innerWidth - 60);
+    const maxH = Math.max(0, window.innerHeight - 60);
+    const safeX = Math.max(0, Math.min(toolbarState.x, maxW));
+    const safeY = Math.max(0, Math.min(toolbarState.y, maxH));
+
     drawBar.style.left = `${toolbarState.x}px`;
     drawBar.style.top = `${toolbarState.y}px`;
     drawBar.style.transform = 'none';
@@ -252,16 +270,24 @@ function injectUI() {
       <button class="db-tool" data-tool="highlight" title="Highlight Text">${ICONS.highlighter}</button>
       <div class="db-sep"></div>
       <button class="db-tool" data-tool="draw" title="Freehand Drawing">${ICONS.pen}</button>
-      <button class="db-tool" data-tool="rect" title="Rectangle">${ICONS.rect}</button>
-      <button class="db-tool" data-tool="ellipse" title="Circle">${ICONS.circle}</button>
-      <button class="db-tool" data-tool="line" title="Line">${ICONS.line}</button>
+      <div class="db-group-wrap">
+        <button class="db-tool has-submenu" id="db-shape-menu" data-tool="rect" title="Shapes">${ICONS.rect}</button>
+        <div class="db-sub-menu hidden" id="db-shape-popup">
+          <button class="db-tool" data-tool="rect" title="Rectangle">${ICONS.rect}</button>
+          <button class="db-tool" data-tool="ellipse" title="Circle">${ICONS.circle}</button>
+          <button class="db-tool" data-tool="line" title="Line">${ICONS.line}</button>
+        </div>
+      </div>
       <div class="db-sep"></div>
-      <div class="db-colors">
-        <div class="db-color active" data-c="#ef4444" style="background:#ef4444;"></div>
-        <div class="db-color" data-c="#3b82f6" style="background:#3b82f6;"></div>
-        <div class="db-color" data-c="#22c55e" style="background:#22c55e;"></div>
-        <div class="db-color" data-c="#eab308" style="background:#eab308;"></div>
-        <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
+      <div class="db-group-wrap">
+        <button class="db-tool has-submenu" id="db-color-menu" title="Color Palette" style="color: #ef4444;">${ICONS.palette}</button>
+        <div class="db-sub-menu db-colors hidden" id="db-color-popup">
+          <div class="db-color active" data-c="#ef4444" style="background:#ef4444;"></div>
+          <div class="db-color" data-c="#3b82f6" style="background:#3b82f6;"></div>
+          <div class="db-color" data-c="#22c55e" style="background:#22c55e;"></div>
+          <div class="db-color" data-c="#eab308" style="background:#eab308;"></div>
+          <div class="db-color" data-c="#1e293b" style="background:#1e293b;"></div>
+        </div>
       </div>
       <div class="db-sep"></div>
       <button class="db-tool db-btn-undo" title="Undo">${ICONS.undo}</button>
@@ -712,19 +738,23 @@ function addHighlight(text) {
 
 function applyHighlightRange(range, hl) {
   const nodes = [];
-  const walker = document.createTreeWalker(
-    range.commonAncestorContainer,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode: n => {
-        if (!range.intersectsNode(n)) return NodeFilter.FILTER_REJECT;
-        const p = n.parentElement;
-        if (p && (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(p.tagName) || p.closest('#webnote-shadow-host'))) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
+  if (range.commonAncestorContainer.nodeType === Node.TEXT_NODE) {
+    nodes.push(range.commonAncestorContainer);
+  } else {
+    const walker = document.createTreeWalker(
+      range.commonAncestorContainer,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: n => {
+          if (!range.intersectsNode(n)) return NodeFilter.FILTER_REJECT;
+          const p = n.parentElement;
+          if (p && (['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(p.tagName) || p.closest('#webnote-shadow-host'))) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
       }
-    }
-  );
-  while (walker.nextNode()) nodes.push(walker.currentNode);
+    );
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+  }
 
   nodes.forEach(node => {
     const r = document.createRange();
@@ -736,13 +766,11 @@ function applyHighlightRange(range, hl) {
     const mark = makeHighlightEl(hl);
     try {
       r.surroundContents(mark);
-      mark.onclick = (e) => { e.stopPropagation(); removeHighlight(hl.id); };
     } catch (e) { }
   });
 }
 
 function paintHighlight(hl) {
-  // Text-search based fallback (used for restoration on reload)
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
     acceptNode: n => {
       const p = n.parentElement;
@@ -753,17 +781,35 @@ function paintHighlight(hl) {
       return NodeFilter.FILTER_ACCEPT;
     }
   });
+
+  const nodes = [];
+  let fullText = '';
   let node;
   while ((node = walker.nextNode())) {
-    const idx = node.textContent.indexOf(hl.text);
-    if (idx === -1) continue;
+    nodes.push({ node, start: fullText.length, end: fullText.length + node.textContent.length });
+    fullText += node.textContent;
+  }
+
+  // We only highlight the first match in this simple implementation
+  const matchIdx = fullText.indexOf(hl.text);
+  if (matchIdx === -1) return;
+  const matchEnd = matchIdx + hl.text.length;
+
+  const matchNodes = nodes.filter(n => n.end > matchIdx && n.start < matchEnd);
+
+  // Process backwards to preserve text offsets
+  for (let i = matchNodes.length - 1; i >= 0; i--) {
+    const nInfo = matchNodes[i];
+    const nodeStart = Math.max(0, matchIdx - nInfo.start);
+    const nodeEnd = Math.min(nInfo.node.textContent.length, matchEnd - nInfo.start);
+    if (nodeStart >= nodeEnd) continue;
+
     try {
       const range = document.createRange();
-      range.setStart(node, idx); range.setEnd(node, idx + hl.text.length);
+      range.setStart(nInfo.node, nodeStart);
+      range.setEnd(nInfo.node, nodeEnd);
       const mark = makeHighlightEl(hl);
       range.surroundContents(mark);
-      mark.onclick = () => removeHighlight(hl.id);
-      return;
     } catch (_) { }
   }
 }
@@ -773,7 +819,7 @@ function makeHighlightEl(hl) {
   span.className = 'webnote-hl';
   span.style.backgroundColor = hl.color;
   span.dataset.wn = hl.id;
-  span.title = 'WebNote Highlight – Click to remove';
+  span.title = 'WebNote Highlight – Use Eraser tool to remove';
   return span;
 }
 
@@ -1225,15 +1271,22 @@ function setupDrawingBoard(svg, bar) {
     ghost.style.visibility = 'hidden';
     ghost.style.position = 'absolute';
     ghost.style.pointerEvents = 'none';
-
-    ghost.style.width = '';
-    ghost.style.height = '';
+    ghost.style.width = 'max-content';
+    ghost.style.height = 'auto';
     ghost.classList.remove('minimized');
 
     shadow.appendChild(ghost);
-    const w = ghost.offsetWidth;
-    const h = ghost.offsetHeight;
+
+    window.getComputedStyle(ghost).width;
+
+
+    const w = toolbarState.vert ? Math.max(ghost.offsetWidth, 42) : Math.max(ghost.offsetWidth, 300);
+    const h = toolbarState.vert ? Math.max(ghost.offsetHeight, 300) : Math.max(ghost.offsetHeight, 42);
     shadow.removeChild(ghost);
+
+    //const w = ghost.offsetWidth;
+    //const h = ghost.offsetHeight;
+    //shadow.removeChild(ghost);
 
     // 2. Prepare for expansion: Hold 52px size then remove class
     bar.style.width = '52px';
@@ -1309,6 +1362,36 @@ function setupDrawingBoard(svg, bar) {
     bar.style.display = 'none';
   };
 
+  // Submenu logic
+  const shapeMenuBtn = bar.querySelector('#db-shape-menu');
+  const shapePopup = bar.querySelector('#db-shape-popup');
+  const colorMenuBtn = bar.querySelector('#db-color-menu');
+  const colorPopup = bar.querySelector('#db-color-popup');
+
+  if (shapeMenuBtn) shapeMenuBtn.onclick = (e) => {
+    e.stopPropagation();
+    colorPopup.classList.add('hidden');
+    shapePopup.classList.toggle('hidden');
+    setTool(shapeMenuBtn.dataset.tool);
+  };
+  if (colorMenuBtn) colorMenuBtn.onclick = (e) => {
+    e.stopPropagation();
+    shapePopup.classList.add('hidden');
+    colorPopup.classList.toggle('hidden');
+  };
+  
+  shadow.addEventListener('click', () => {
+    if (shapePopup) shapePopup.classList.add('hidden');
+    if (colorPopup) colorPopup.classList.add('hidden');
+  });
+
+  bar.querySelectorAll('#db-shape-popup .db-tool').forEach(btn => {
+    btn.addEventListener('click', () => {
+      shapeMenuBtn.innerHTML = btn.innerHTML;
+      shapeMenuBtn.dataset.tool = btn.dataset.tool;
+    });
+  });
+
   // Toolbar Drag Logic
   const handle = bar.querySelector('.db-drag-handle');
   const minIcon = bar.querySelector('.db-min-icon');
@@ -1347,6 +1430,7 @@ function setupDrawingBoard(svg, bar) {
       bar.querySelectorAll('.db-color').forEach(s => s.classList.remove('active'));
       sw.classList.add('active');
       activeColor = sw.dataset.c;
+      if (colorMenuBtn) colorMenuBtn.style.color = activeColor;
     };
   });
 
@@ -1678,6 +1762,7 @@ function startScreenshotMode() {
       try {
         const response = await fetch(dataUrl);
         const blob = await response.blob();
+        window.focus(); // Ensure document is focused before clipboard write
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob })
         ]);
@@ -1708,3 +1793,4 @@ function startScreenshotMode() {
     setTimeout(() => { t.style.opacity = '0'; t.style.transition = '0.3s'; setTimeout(() => t.remove(), 300); }, 2000);
   }
 }
+})();
