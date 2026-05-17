@@ -286,9 +286,7 @@ function injectUI() {
           <button class="db-tool" data-tool="arrow" title="Arrow">${ICONS.arrow}</button>
           <div class="db-shape-sep"></div>
           <button class="db-tool" data-tool="censor-glass" title="Frosted Glass Blur">${ICONS.censorGlass}</button>
-          <button class="db-tool" data-tool="censor-pixel" title="Pixelated Mosaic">${ICONS.censorPixel}</button>
           <button class="db-tool" data-tool="censor-solid" title="Redacted Blackout">${ICONS.censorSolid}</button>
-          <button class="db-tool" data-tool="censor-aurora" title="Neon Aurora Glow">${ICONS.censorAurora}</button>
         </div>
       </div>
       <div class="db-sep"></div>
@@ -1089,12 +1087,8 @@ function renderDrawings() {
       let html = '';
       if (d.type === 'censor-glass' || d.type === 'blur') {
         html = `<div style="width:100%; height:100%; backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); background-color: rgba(255, 255, 255, 0.15); border: 1.5px dashed rgba(99, 102, 241, 0.45); border-radius: 4px; pointer-events: none; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);"></div>`;
-      } else if (d.type === 'censor-pixel') {
-        html = `<div style="width:100%; height:100%; backdrop-filter: blur(25px) contrast(1.15); -webkit-backdrop-filter: blur(25px) contrast(1.15); background-image: repeating-conic-gradient(rgba(0, 0, 0, 0.08) 0% 25%, transparent 0% 50%); background-size: 8px 8px; background-color: rgba(255, 255, 255, 0.15); border: 1.5px dashed rgba(99, 102, 241, 0.45); border-radius: 4px; pointer-events: none;"></div>`;
       } else if (d.type === 'censor-solid') {
         html = `<div style="width:100%; height:100%; background: #0f172a; border: 1.5px dashed rgba(255, 255, 255, 0.3); border-radius: 4px; pointer-events: none;"></div>`;
-      } else if (d.type === 'censor-aurora') {
-        html = `<div style="width:100%; height:100%; backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(99, 102, 241, 0.4)); border: 1.5px dashed rgba(168, 85, 247, 0.6); border-radius: 4px; pointer-events: none; box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);"></div>`;
       }
       el.innerHTML = html;
     } else if (d.type === 'ellipse') {
