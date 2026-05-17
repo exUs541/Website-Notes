@@ -75,6 +75,100 @@
   box-shadow: var(--shadow-md), 0 0 0 2px rgba(99, 102, 241, 0.15);
 }
 
+/* ── Floating Icon Mode ────────────────────────────────────────────────────── */
+.webnote-sticky.m-icon {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  overflow: visible !important;
+  cursor: grab !important;
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 2px solid rgba(99, 102, 241, 0.35) !important;
+  box-shadow:
+    0 8px 20px rgba(99, 102, 241, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.webnote-sticky.m-icon:active {
+  cursor: grabbing !important;
+}
+
+.webnote-sticky.m-icon:hover {
+  transform: scale(1.12);
+  box-shadow:
+    0 12px 28px rgba(99, 102, 241, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Hide all inner content in icon mode */
+.webnote-sticky.m-icon .nh,
+.webnote-sticky.m-icon .fmt-bar,
+.webnote-sticky.m-icon .nb-wrap,
+.webnote-sticky.m-icon .tags-row,
+.webnote-sticky.m-icon .rz {
+  display: none !important;
+}
+
+/* The floating icon itself */
+.webnote-sticky.m-icon .note-float-icon {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #6366f1;
+  position: relative;
+}
+
+.webnote-sticky.m-icon .note-float-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Tooltip showing the note title */
+.webnote-sticky.m-icon .note-float-icon::after {
+  content: attr(data-title);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(8px);
+  color: white;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 99999;
+}
+
+.webnote-sticky.m-icon:hover .note-float-icon::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Hidden float icon element in normal mode */
+.note-float-icon {
+  display: none;
+}
+
 /* ── Note Header ───────────────────────────────────────────────────────────── */
 .nh {
   height: 42px;

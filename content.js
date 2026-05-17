@@ -36,6 +36,7 @@ const ICONS = {
   palette: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.7-.72 1.7-1.65 0-.44-.19-.84-.49-1.15-.3-.3-.49-.71-.49-1.2 0-.92.73-1.64 1.63-1.64h2.9c3.04 0 5.5-2.43 5.5-5.46C22 5.4 17.53 2 12 2z"/></svg>`,
   duplicate: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
   compact: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  note: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3z"/><path d="M15 3v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>`,
   expand: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>`,
   trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
   refresh: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>`,
@@ -456,12 +457,16 @@ function noteHTML(note) {
     <div class="tags-chips">${chips}</div>
     <input class="tag-inp" placeholder="#tag + Enter" type="text">
   </div>
-  <div class="rz"></div>`;
+  <div class="rz"></div>
+  <div class="note-float-icon" data-title="${note.title || 'Untitled'}">${ICONS.note}</div>`;
 }
 
 function applyStyle(el, note) {
   el.className = ['webnote-sticky', `m-${note.displayMode}`, note.pinned ? 'pinned' : ''].filter(Boolean).join(' ');
-  el.style.background = note.color || '';
+  el.style.background = note.displayMode === 'icon' ? '' : (note.color || '');
+  // Update float icon tooltip when title changes
+  const floatIcon = el.querySelector('.note-float-icon');
+  if (floatIcon) floatIcon.setAttribute('data-title', note.title || 'Untitled');
 }
 
 function positionNote(el, note) {
@@ -485,7 +490,13 @@ function bindEvents(el, note) {
   const qa = s => el.querySelectorAll(s);
 
   // Title
-  q('.t-inp').oninput = e => { note.title = e.target.value; saveNotes(); };
+  q('.t-inp').oninput = e => {
+    note.title = e.target.value;
+    // Keep float icon tooltip in sync
+    const fi = q('.note-float-icon');
+    if (fi) fi.setAttribute('data-title', note.title || 'Untitled');
+    saveNotes();
+  };
 
   // Body
   const nb = q('.nb');
@@ -585,10 +596,23 @@ function bindEvents(el, note) {
     saveNotes(); renderNote(copy); updateSidebarList(); updateBadge();
   };
 
-  // ── Compact ──
+  // ── Minimize to floating icon ──
   q('.cp-btn').onclick = () => {
-    note.displayMode = note.displayMode === 'compact' ? 'full' : 'compact';
+    if (note.displayMode === 'icon') {
+      note.displayMode = 'full';
+    } else {
+      note.displayMode = 'icon';
+    }
     applyStyle(el, note); positionNote(el, note); saveNotes();
+  };
+
+  // ── Click floating icon to restore ──
+  q('.note-float-icon').onclick = (e) => {
+    if (note.displayMode === 'icon') {
+      e.stopPropagation();
+      note.displayMode = 'full';
+      applyStyle(el, note); positionNote(el, note); saveNotes();
+    }
   };
 
   // ── □ Expand / Restore toggle ──
@@ -635,8 +659,40 @@ function bindEvents(el, note) {
     el.remove(); saveNotes(); updateSidebarList(); updateBadge();
   };
 
-  // ── Drag ──
+  // ── Drag (normal mode via handle) ──
   drag(el, note, q('.dh'));
+
+  // ── Drag (icon mode: whole bubble is the handle) ──
+  el.addEventListener('mousedown', (e) => {
+    if (note.displayMode !== 'icon') return;
+    // Don't start drag on clicks that will become a restore click
+    let moved = false;
+    const sX = e.clientX, sY = e.clientY;
+    const oL = el.offsetLeft, oT = el.offsetTop;
+    e.preventDefault();
+    const mv = (me) => {
+      const dx = me.clientX - sX, dy = me.clientY - sY;
+      if (!moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) moved = true;
+      const nx = oL + dx, ny = oT + dy;
+      el.style.left = `${nx}px`; el.style.top = `${ny}px`;
+      if (note.pinned) {
+        note.pageX = nx + scrollX; note.pageY = ny + scrollY;
+      } else {
+        note.x = nx; note.y = ny;
+      }
+    };
+    const up = () => {
+      if (moved) saveNotes();
+      document.removeEventListener('mousemove', mv);
+      document.removeEventListener('mouseup', up);
+      // Prevent the restore click from firing if we just dragged
+      if (moved) {
+        el.addEventListener('click', (ce) => ce.stopPropagation(), { once: true, capture: true });
+      }
+    };
+    document.addEventListener('mousemove', mv);
+    document.addEventListener('mouseup', up);
+  });
 
   // ── Resize ──
   resize(el, note, q('.rz'));
