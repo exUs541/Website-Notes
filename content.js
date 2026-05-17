@@ -717,13 +717,19 @@ function resize(el, note, rz) {
   if (!rz) return;
   rz.onmousedown = e => {
     e.preventDefault();
+    el.classList.add('resizing');
     const sW = el.offsetWidth, sH = el.offsetHeight, sX = e.clientX, sY = e.clientY;
     const mv = me => {
       note.width = Math.max(200, sW + (me.clientX - sX));
       note.height = Math.max(120, sH + (me.clientY - sY));
       el.style.width = `${note.width}px`; el.style.height = `${note.height}px`;
     };
-    const up = () => { saveNotes(); document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+    const up = () => {
+      el.classList.remove('resizing');
+      saveNotes();
+      document.removeEventListener('mousemove', mv);
+      document.removeEventListener('mouseup', up);
+    };
     document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
   };
 }
