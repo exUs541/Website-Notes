@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WebNote: Draw, Highlight & Sticky Notes",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Annotate websites with sticky notes, text highlights, and freehand drawing tools. Everything is saved locally for your research.",
   "permissions": [
     "storage",
