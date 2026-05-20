@@ -191,6 +191,7 @@ async function init() {
     renderDrawings();
     updateBadge();
     window.addEventListener('scroll', updatePinnedPositions, { passive: true });
+    updatePinnedPositions();
     console.log(`[WebNote] v${chrome.runtime.getManifest().version} ready`);
   } catch (e) {
     console.error('[WebNote] init failed', e);
@@ -222,12 +223,12 @@ function injectUI() {
   let host;
   if (ex) {
     host = ex;
-    host.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
     shadow = ex.shadowRoot || ex.attachShadow({ mode: 'open' });
   } else {
     host = document.createElement('div');
     host.id = 'webnote-shadow-host';
-    host.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
     document.body.appendChild(host);
     shadow = host.attachShadow({ mode: 'open' });
   }
@@ -1524,17 +1525,11 @@ function renderDrawings() {
 }
 
 function setupDrawingBoard(svg, bar) {
-  // Update SVG size
   const updateSvgSize = () => {
     const w = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, window.innerWidth) + 'px';
     const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 'px';
     svg.style.width = w;
     svg.style.height = h;
-    const host = document.querySelector('#webnote-shadow-host');
-    if (host) {
-      host.style.width = w;
-      host.style.height = h;
-    }
   };
   window.addEventListener('resize', updateSvgSize);
   new MutationObserver(updateSvgSize).observe(document.body, { childList: true, subtree: true });
@@ -1618,17 +1613,26 @@ function setupDrawingBoard(svg, bar) {
 
     void bar.offsetWidth;
 
+    // Check bounds and choose expansion direction (left if horizontal and no space right, up if vertical and no space bottom)
+    if (toolbarState.x !== null && toolbarState.y !== null) {
+      if (!toolbarState.vert) {
+        if (toolbarState.x + w > window.innerWidth) {
+          const diff = w - 52;
+          toolbarState.x = Math.max(0, toolbarState.x - diff);
+          bar.style.left = `${toolbarState.x}px`;
+        }
+      } else {
+        if (toolbarState.y + h > window.innerHeight) {
+          const diff = h - 52;
+          toolbarState.y = Math.max(0, toolbarState.y - diff);
+          bar.style.top = `${toolbarState.y}px`;
+        }
+      }
+    }
+
     // Trigger CSS transition to target size
     bar.style.width = `${w}px`;
     bar.style.height = `${h}px`;
-
-    // 3. Force reflow and wait for next frames to trigger transition
-    // requestAnimationFrame(() => {
-    //   requestAnimationFrame(() => {
-    //     bar.style.width = w + 'px';
-    //     bar.style.height = h + 'px';
-    //   });
-    // });
 
     // 4. Clean up after animation
     setTimeout(() => {
@@ -1666,10 +1670,46 @@ function setupDrawingBoard(svg, bar) {
     chrome.storage.local.set({ toolbarState });
   };
   bar.querySelector('.db-toggle-dir').onclick = () => {
-    toolbarState.vert = !toolbarState.vert;
+    // 1. Ghost measurement for the future layout state
+    const ghost = bar.cloneNode(true);
+    ghost.style.visibility = 'hidden';
+    ghost.style.position = 'absolute';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.width = 'max-content';
+    ghost.style.height = 'auto';
+    ghost.classList.remove('minimized');
+    
+    const targetVert = !toolbarState.vert;
+    ghost.classList.toggle('vertical', targetVert);
+
+    shadow.appendChild(ghost);
+    window.getComputedStyle(ghost).width; // Force reflow
+    
+    const w = targetVert ? Math.max(ghost.offsetWidth, 42) : Math.max(ghost.offsetWidth, 300);
+    const h = targetVert ? Math.max(ghost.offsetHeight, 300) : Math.max(ghost.offsetHeight, 42);
+    shadow.removeChild(ghost);
+
+    // 2. Perform the toggle
+    toolbarState.vert = targetVert;
     bar.querySelector('.db-toggle-dir').innerHTML = toolbarState.vert ? ICONS.horiz : ICONS.vert;
     bar.classList.toggle('vertical', toolbarState.vert);
     bar.querySelector('.db-btn-min').innerHTML = toolbarState.vert ? ICONS.up : ICONS.left;
+
+    // 3. Shift position if there is not enough room at the bottom/right for the new layout
+    if (toolbarState.x !== null && toolbarState.y !== null) {
+      if (toolbarState.vert) {
+        if (toolbarState.y + h > window.innerHeight) {
+          toolbarState.y = Math.max(0, window.innerHeight - h);
+          bar.style.top = `${toolbarState.y}px`;
+        }
+      } else {
+        if (toolbarState.x + w > window.innerWidth) {
+          toolbarState.x = Math.max(0, window.innerWidth - w);
+          bar.style.left = `${toolbarState.x}px`;
+        }
+      }
+    }
+
     chrome.storage.local.set({ toolbarState });
   };
   bar.querySelector('.db-btn-list').onclick = () => toggleSidebar();
