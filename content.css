@@ -432,14 +432,20 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.4);
   padding: 6px;
   z-index: 2147483647;
-  /* Identisch zum Einklappen: Radius sofort, Größe nach 0.15s */
-  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.15s,
-    height 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.15s,
-    border-radius 0.3s ease 0s,
+  /* Aufklappen/Verschieben: Eckenradius wechselt sofort (keine Transition), Weiten-, Höhen-, Positions- und Transformausdehnung laufen flüssig ab */
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+    height 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+    top 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+    left 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
     background 0.3s ease,
     box-shadow 0.5s ease;
   display: flex;
   box-sizing: border-box;
+}
+
+.webnote-drawbar.db-dragging {
+  transition: none !important;
 }
 
 .webnote-drawbar.vertical {
@@ -530,6 +536,22 @@
 .db-tool.has-submenu:hover::after {
   opacity: 1;
   transform: translateY(0.5px);
+}
+
+.webnote-drawbar.vertical .db-tool.has-submenu::after {
+  border-top: 3px solid transparent;
+  border-right: none;
+  border-bottom: 3px solid transparent;
+  border-left: 3.5px solid currentColor;
+}
+
+.webnote-drawbar.vertical .db-tool.has-submenu.active::after {
+  border-left-color: white;
+}
+
+.webnote-drawbar.vertical .db-tool.has-submenu:hover::after {
+  opacity: 1;
+  transform: translateY(0) translateX(0.5px);
 }
 
 .db-group-wrap {

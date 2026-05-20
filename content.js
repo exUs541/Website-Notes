@@ -239,6 +239,103 @@ function injectUI() {
   link.href = chrome.runtime.getURL('content.css');
   shadow.appendChild(link);
 
+  const baseStyle = document.createElement('style');
+  baseStyle.textContent = `
+    .hidden:not(.webnote-sidebar) {
+      display: none !important;
+    }
+    .webnote-sidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 340px;
+      height: 100vh;
+      z-index: 2147483647;
+      transform: translateX(100%);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      box-sizing: border-box;
+    }
+    .webnote-sidebar:not(.hidden) {
+      transform: translateX(0);
+    }
+    .webnote-drawbar {
+      position: fixed;
+      z-index: 2147483647;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+                  height 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+                  top 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+                  left 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+                  transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0s,
+                  background 0.4s ease;
+    }
+    .webnote-drawbar.db-dragging {
+      transition: none !important;
+    }
+    .webnote-drawbar.minimized {
+      width: 52px !important;
+      height: 52px !important;
+      border-radius: 50% !important;
+      overflow: hidden !important;
+      padding: 0 !important;
+      background: #6366f1 !important;
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4) !important;
+    }
+    .webnote-drawbar.minimized .db-full {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    .webnote-drawbar.minimized .db-min-icon {
+      opacity: 1 !important;
+      transform: translate(-50%, -50%) scale(1) !important;
+      pointer-events: all !important;
+      display: flex !important;
+    }
+    .webnote-drawbar:not(.minimized) {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      padding: 6px;
+    }
+    .webnote-drawbar:not(.minimized) .db-min-icon {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    .db-min-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      border-radius: 50%;
+      box-sizing: border-box;
+    }
+    .webnote-drawbar.vertical .db-tool.has-submenu::after {
+      border-top: 3px solid transparent !important;
+      border-right: none !important;
+      border-bottom: 3px solid transparent !important;
+      border-left: 3.5px solid currentColor !important;
+    }
+    .webnote-drawbar.vertical .db-tool.has-submenu.active::after {
+      border-left-color: white !important;
+    }
+    .webnote-drawbar.vertical .db-tool.has-submenu:hover::after {
+      opacity: 1 !important;
+      transform: translateY(0) translateX(0.5px) !important;
+    }
+  `;
+  shadow.appendChild(baseStyle);
+
   // SVG Drawing Overlay
   const svgNS = "http://www.w3.org/2000/svg";
   const svgOverlay = document.createElementNS(svgNS, "svg");
@@ -1647,6 +1744,8 @@ function setupDrawingBoard(svg, bar) {
     let sX, sY, oL, oT;
     dragEl.onmousedown = e => {
       e.preventDefault();
+      bar.classList.add('db-dragging'); // Disable transitions while dragging
+      bar.style.transform = 'none'; // Clear centering transform before reading offset
       sX = e.clientX; sY = e.clientY;
       oL = bar.offsetLeft; oT = bar.offsetTop;
       dragEl.dataset.dragged = 'false';
@@ -1662,6 +1761,7 @@ function setupDrawingBoard(svg, bar) {
         toolbarState.x = nx; toolbarState.y = ny;
       };
       const up = () => {
+        bar.classList.remove('db-dragging'); // Re-enable transitions
         chrome.storage.local.set({ toolbarState });
         document.removeEventListener('mousemove', mv);
         document.removeEventListener('mouseup', up);
