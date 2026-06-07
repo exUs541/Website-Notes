@@ -47,6 +47,8 @@ const ICONS = {
   target: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`,
   clipboard: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>`,
   download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  eye: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  eyeOff: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`,
 };
 
 // content.js - WebNote v3.1
@@ -59,6 +61,7 @@ let rules = { hiddenUrls: [] };
 let shadow = null;
 let sidebarSort = 'date-desc';
 let sidebarGroup = 'none';
+let bubbleOpacity = 80;
 
 let drawings = [];
 let activeTool = 'cursor'; // cursor, highlight, draw, rect, ellipse
@@ -136,7 +139,7 @@ function migrateNote(note) {
   if (!note.pageY) note.pageY = (note.y || 100) + (window.scrollY || 0);
 
   // Normalize display mode (old: 'minimized' → just go 'full')
-  if (!['full', 'compact'].includes(note.displayMode)) note.displayMode = 'full';
+  if (!['full', 'compact', 'icon'].includes(note.displayMode)) note.displayMode = 'full';
 
   return note;
 }
@@ -144,7 +147,7 @@ function migrateNote(note) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const data = await chrome.storage.local.get(['notes', 'highlights', 'rules', 'sidebarSort', 'sidebarGroup', 'drawings', 'toolbarState', 'autoShowFAB']);
+    const data = await chrome.storage.local.get(['notes', 'highlights', 'rules', 'sidebarSort', 'sidebarGroup', 'drawings', 'toolbarState', 'autoShowFAB', 'bubbleOpacity']);
     notes = (data.notes || []).map(migrateNote);
     highlights = data.highlights || [];
     rules = data.rules || { hiddenUrls: [] };
@@ -152,6 +155,7 @@ async function init() {
     sidebarGroup = data.sidebarGroup || 'none';
     drawings = data.drawings || [];
     toolbarState = data.toolbarState || { x: null, y: 20, min: false, vert: false, hidden: false };
+    bubbleOpacity = data.bubbleOpacity !== undefined ? data.bubbleOpacity : 80;
     
     // Auto-show logic
     const autoShow = data.autoShowFAB !== false;
@@ -232,6 +236,8 @@ function injectUI() {
     document.body.appendChild(host);
     shadow = host.attachShadow({ mode: 'open' });
   }
+
+  host.style.setProperty('--webnote-bubble-opacity', bubbleOpacity / 100);
 
   if (shadow.querySelector('#webnote-drawbar')) return;
 
@@ -539,6 +545,7 @@ function noteHTML(note) {
       <button class="icon-btn dup-btn" title="Duplicate">${ICONS.duplicate}</button>
       <button class="icon-btn cp-btn" title="Compact">${ICONS.compact}</button>
       <button class="icon-btn ex-btn" title="Expand">${ICONS.expand}</button>
+      <button class="icon-btn hide-btn" title="Hide">${ICONS.eyeOff}</button>
       <button class="icon-btn dl-btn" title="Delete">${ICONS.trash}</button>
     </div>
   </div>
@@ -756,6 +763,18 @@ function bindEvents(el, note) {
     notes = notes.filter(n => n.id !== note.id);
     el.remove(); saveNotes(); updateSidebarList(); updateBadge();
   };
+
+  // ── Hide ──
+  const hb = q('.hide-btn');
+  if (hb) {
+    hb.onclick = () => {
+      note.hidden = true;
+      el.remove();
+      saveNotes();
+      updateSidebarList();
+      updateBadge();
+    };
+  }
 
   // ── Drag (normal mode via handle) ──
   drag(el, note, q('.dh'));
@@ -1133,17 +1152,26 @@ function updateSidebarList(query = '') {
       const tags = note.tags.map(t => `<span class="sb-tag">#${t}</span>`).join(' ');
       const preview = note.content.replace(/<[^>]+>/g, '').substring(0, 50) || '(empty)';
       const cbg = note.color ? `background:${note.color}33;border-left:3px solid ${note.color};` : '';
+      
+      const actionHtml = note.hidden
+        ? `<div class="sb-item-action unhide" title="Unhide">${ICONS.eye}</div>`
+        : `<div class="sb-item-action edit" title="Edit">${ICONS.pen}</div>`;
+      
+      const titleLabel = note.hidden ? `${note.title || 'Untitled'} <span class="hidden-badge">(Hidden)</span>` : (note.title || 'Untitled');
+
+      item.className = 'sb-item' + (note.hidden ? ' hidden-note' : '');
       item.innerHTML = `
         <div class="sb-item-actions">
-          <div class="sb-item-action edit" title="Edit">${ICONS.pen}</div>
+          ${actionHtml}
           <div class="sb-item-action del" title="Delete">${ICONS.trash}</div>
         </div>
-        <div class="sb-item-title" style="${cbg}">${note.pinned ? ICONS.pinned : ICONS.pin} ${note.title || 'Untitled'}</div>
+        <div class="sb-item-title" style="${cbg}">${note.pinned ? ICONS.pinned : ICONS.pin} ${titleLabel}</div>
         ${tags ? `<div class="sb-item-tags">${tags}</div>` : ''}
         <div class="sb-item-preview">${preview}…</div>`;
 
       item.onclick = (e) => {
         if (e.target.closest('.sb-item-action')) return;
+        if (note.hidden) return;
         if (note.displayMode !== 'full') {
           note.displayMode = 'full';
           const el = shadow.querySelector(`#note-${note.id}`);
@@ -1153,25 +1181,42 @@ function updateSidebarList(query = '') {
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       };
 
-      item.querySelector('.edit').onclick = (e) => {
-        e.stopPropagation();
-        if (note.displayMode !== 'full') {
-          note.displayMode = 'full';
-          saveNotes();
-          const el = shadow.querySelector(`#note-${note.id}`);
-          if (el) { applyStyle(el, note); positionNote(el, note); }
+      if (note.hidden) {
+        const unhideBtn = item.querySelector('.unhide');
+        if (unhideBtn) {
+          unhideBtn.onclick = (e) => {
+            e.stopPropagation();
+            note.hidden = false;
+            saveNotes();
+            renderNote(note);
+            updateSidebarList(query);
+            updateBadge();
+          };
         }
-        const el = shadow.querySelector(`#note-${note.id}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          const titleInp = el.querySelector('.t-inp');
-          if (titleInp) {
-            titleInp.focus();
-            const len = titleInp.value.length;
-            titleInp.setSelectionRange(len, len);
-          }
+      } else {
+        const editBtn = item.querySelector('.edit');
+        if (editBtn) {
+          editBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (note.displayMode !== 'full') {
+              note.displayMode = 'full';
+              saveNotes();
+              const el = shadow.querySelector(`#note-${note.id}`);
+              if (el) { applyStyle(el, note); positionNote(el, note); }
+            }
+            const el = shadow.querySelector(`#note-${note.id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const titleInp = el.querySelector('.t-inp');
+              if (titleInp) {
+                titleInp.focus();
+                const len = titleInp.value.length;
+                titleInp.setSelectionRange(len, len);
+              }
+            }
+          };
         }
-      };
+      }
 
       item.querySelector('.del').onclick = (e) => {
         e.stopPropagation();
@@ -1191,14 +1236,14 @@ function updateSidebarList(query = '') {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function renderPageNotes() {
   const cur = normUrl(location.href);
-  notes.filter(n => normUrl(n.url) === cur).forEach(renderNote);
+  notes.filter(n => normUrl(n.url) === cur && !n.hidden).forEach(renderNote);
 }
 
 function saveNotes() { chrome.storage.local.set({ notes, rules, sidebarSort, sidebarGroup }); }
 
 function updateBadge() {
   const cur = normUrl(location.href);
-  const count = notes.filter(n => normUrl(n.url) === cur).length;
+  const count = notes.filter(n => normUrl(n.url) === cur && !n.hidden).length;
   try {
     chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => { });
   } catch (e) {
@@ -2039,6 +2084,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     
     chrome.storage.local.set({ toolbarState });
     if (bar) bar.style.display = toolbarState.hidden ? 'none' : 'flex';
+  }
+  if (msg.action === 'BUBBLE_OPACITY_CHANGED') {
+    bubbleOpacity = msg.value;
+    const host = document.querySelector('#webnote-shadow-host');
+    if (host) {
+      host.style.setProperty('--webnote-bubble-opacity', bubbleOpacity / 100);
+    }
   }
   reply({ ok: true });
 });

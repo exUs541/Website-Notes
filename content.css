@@ -94,6 +94,7 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  opacity: var(--webnote-bubble-opacity, 0.8) !important;
 }
 
 .webnote-sticky.m-icon:active {
@@ -734,6 +735,26 @@
   border-color: #cbd5e1;
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
+}
+
+.sb-item.hidden-note {
+  opacity: 0.6;
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.sb-item.hidden-note:hover {
+  opacity: 0.85;
+}
+
+.sb-item-title .hidden-badge {
+  font-size: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  font-weight: 500;
 }
 
 .sb-item-title {

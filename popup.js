@@ -1,7 +1,7 @@
 // popup.js
 async function updateStats() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const data = await chrome.storage.local.get(['notes', 'autoShowFAB']);
+  const data = await chrome.storage.local.get(['notes', 'autoShowFAB', 'bubbleOpacity']);
   const notes = data.notes || [];
   
   const totalCount = notes.length;
@@ -14,6 +14,11 @@ async function updateStats() {
   // Set toggle state (default true)
   const autoShow = data.autoShowFAB !== false;
   document.getElementById('auto-show-fab').checked = autoShow;
+
+  // Set bubble opacity state (default 80)
+  const bubbleOpacity = data.bubbleOpacity !== undefined ? data.bubbleOpacity : 80;
+  document.getElementById('bubble-opacity-slider').value = bubbleOpacity;
+  document.getElementById('bubble-opacity-val').textContent = `${bubbleOpacity}%`;
 }
 
 document.getElementById('add-note').onclick = async () => {
@@ -67,6 +72,18 @@ document.getElementById('auto-show-fab').onchange = async (e) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) {
     chrome.tabs.sendMessage(tab.id, { action: "AUTO_SHOW_CHANGED", value: autoShow }).catch(() => {});
+  }
+};
+
+document.getElementById('bubble-opacity-slider').oninput = async (e) => {
+  const val = parseInt(e.target.value);
+  document.getElementById('bubble-opacity-val').textContent = `${val}%`;
+  await chrome.storage.local.set({ bubbleOpacity: val });
+  
+  // Notify active tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab) {
+    chrome.tabs.sendMessage(tab.id, { action: "BUBBLE_OPACITY_CHANGED", value: val }).catch(() => {});
   }
 };
 

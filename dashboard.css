@@ -178,6 +178,37 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-card .meta a {
+  color: var(--text-muted);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+  transition: color 0.2s;
+}
+
+.note-card .meta a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.note-card .meta .hidden-badge {
+  font-size: 9px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .note-card .body {
@@ -185,10 +216,17 @@ h2 {
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-main);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
+  overflow-y: auto;
+  border-radius: 6px;
+  padding: 4px;
+  transition: all 0.2s;
+  outline: none;
+  cursor: text;
+}
+
+.note-card .body:focus {
+  background: #f8fafc;
+  box-shadow: inset 0 0 0 1px #cbd5e1;
 }
 
 .note-card .footer {

@@ -34,14 +34,29 @@ function renderNotes() {
   filtered.forEach(note => {
     const card = document.createElement('div');
     card.className = 'note-card';
+    const hiddenBadge = note.hidden ? ' <span class="hidden-badge">(Hidden)</span>' : '';
     card.innerHTML = `
-      <div class="meta">${note.url}</div>
-      <div class="body">${note.content || '<i>Empty note</i>'}</div>
+      <div class="meta">
+        <a href="${note.url}" target="_blank" title="Go to note source page">${note.url}</a>
+        ${hiddenBadge}
+      </div>
+      <div class="body" contenteditable="true" spellcheck="true" title="Click to edit content">${note.content || ''}</div>
       <div class="footer">
         <button class="delete-btn" data-id="${note.id}">Delete</button>
       </div>
     `;
     card.querySelector('.delete-btn').onclick = () => deleteNote(note.id);
+    
+    // Save inline editing changes on blur
+    const bodyEl = card.querySelector('.body');
+    bodyEl.onblur = async () => {
+      const newContent = bodyEl.innerHTML;
+      if (newContent !== note.content) {
+        note.content = newContent;
+        await chrome.storage.local.set({ notes });
+      }
+    };
+    
     grid.appendChild(card);
   });
 }
