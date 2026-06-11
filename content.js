@@ -49,6 +49,9 @@ const ICONS = {
   download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   eye: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
   eyeOff: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`,
+  video: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>`,
+  videoStop: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="5" y="5" rx="2"/></svg>`,
+  scrollPage: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 8v8"/><path d="m9 11 3-3 3 3"/><path d="m9 16 3 3 3-3"/></svg>`,
 };
 
 // content.js - WebNote v3.1
@@ -428,6 +431,8 @@ function injectUI() {
       <button class="db-tool db-btn-clear" title="Clear all on this page">${ICONS.trash}</button>
       <div class="db-sep"></div>
       <button class="db-tool db-btn-screenshot" title="Capture Screenshot">${ICONS.camera}</button>
+      <button class="db-tool db-btn-video" title="Record Video">${ICONS.video}</button>
+      <button class="db-tool db-btn-scroll-ss" title="Full-Page Scrollable Screenshot">${ICONS.scrollPage}</button>
       <button class="db-tool db-btn-min" title="Minimize">${toolbarState.vert ? ICONS.up : ICONS.left}</button>
       <button class="db-tool db-btn-close" title="Hide Toolbar">${ICONS.close}</button>
     </div>
@@ -1764,6 +1769,12 @@ function setupDrawingBoard(svg, bar) {
   bar.querySelector('.db-btn-screenshot').onclick = () => {
     startScreenshotMode();
   };
+  bar.querySelector('.db-btn-video').onclick = () => {
+    startVideoRecorder();
+  };
+  bar.querySelector('.db-btn-scroll-ss').onclick = () => {
+    startScrollableScreenshot();
+  };
   bar.querySelector('.db-btn-close').onclick = () => {
     toolbarState.hidden = true;
     chrome.storage.local.set({ toolbarState });
@@ -2311,4 +2322,378 @@ function startScreenshotMode() {
     setTimeout(() => { t.style.opacity = '0'; t.style.transition = '0.3s'; setTimeout(() => t.remove(), 300); }, 2000);
   }
 }
+
+// ── Video Recorder ──────────────────────────────────────────────────────────
+function startVideoRecorder() {
+  const container = document.querySelector('#webnote-shadow-host');
+  if (!container) return;
+  const shadowRoot = container.shadowRoot;
+
+  // Prevent duplicate
+  if (shadowRoot.querySelector('.wn-rec-pick-overlay') || shadowRoot.querySelector('.wn-rec-pill')) return;
+
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let stream = null;
+  let timerInterval = null;
+  let secondsElapsed = 0;
+  let withBrowserAudio = true;
+  let withMicAudio = false;
+
+  // ── Choose-source overlay ────────────────────────────────────────────────
+  const pickOverlay = document.createElement('div');
+  pickOverlay.className = 'wn-rec-pick-overlay';
+  pickOverlay.innerHTML = `
+    <div class="wn-rec-pick-card">
+      <div class="wn-rec-pick-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+        Video-Aufnahme
+      </div>
+      <p class="wn-rec-pick-sub">Chrome öffnet einen Dialog zur Auswahl des aufzunehmenden Inhalts (Tab, Fenster oder Bildschirm).</p>
+      <div class="wn-rec-audio-section">
+        <div class="wn-rec-audio-heading">Audio-Einstellungen</div>
+        <label class="wn-rec-audio-label">
+          <input type="checkbox" id="wn-rec-browser-audio-cb" checked>
+          <span class="wn-rec-audio-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="10" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+          </span>
+          Browser- / Tab-Audio
+        </label>
+        <label class="wn-rec-audio-label">
+          <input type="checkbox" id="wn-rec-mic-audio-cb">
+          <span class="wn-rec-audio-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+          </span>
+          Mikrofon-Audio
+        </label>
+      </div>
+      <div class="wn-rec-pick-actions">
+        <button class="wn-rec-pick-btn wn-rec-pick-cancel">Abbrechen</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-start">Aufnahme starten</button>
+      </div>
+    </div>
+  `;
+  shadowRoot.appendChild(pickOverlay);
+
+  pickOverlay.querySelector('.wn-rec-pick-cancel').onclick = () => pickOverlay.remove();
+  pickOverlay.querySelector('.wn-rec-pick-start').onclick = async () => {
+    withBrowserAudio = pickOverlay.querySelector('#wn-rec-browser-audio-cb').checked;
+    withMicAudio = pickOverlay.querySelector('#wn-rec-mic-audio-cb').checked;
+    pickOverlay.remove();
+    await beginRecording();
+  };
+
+  async function beginRecording() {
+    try {
+      // Request display media; pass audio:true only when browser audio is desired
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 },
+        audio: withBrowserAudio // Chrome shows "Share tab audio" checkbox only if true
+      });
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') {
+        console.error('[WebNote] getDisplayMedia failed:', err);
+      }
+      return; // User cancelled or error
+    }
+
+    // Optionally mix in microphone audio
+    if (withMicAudio || withBrowserAudio) {
+      try {
+        const ctx = new AudioContext();
+        const dest = ctx.createMediaStreamDestination();
+
+        // Add browser/tab audio if available and desired
+        if (withBrowserAudio) {
+          const tabAudioTracks = stream.getAudioTracks();
+          if (tabAudioTracks.length > 0) {
+            ctx.createMediaStreamSource(new MediaStream(tabAudioTracks)).connect(dest);
+          }
+        }
+
+        // Add microphone audio if desired
+        if (withMicAudio) {
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          ctx.createMediaStreamSource(micStream).connect(dest);
+        }
+
+        // Re-combine video + mixed audio tracks
+        const audioTracks = dest.stream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          stream = new MediaStream([
+            ...stream.getVideoTracks(),
+            ...audioTracks
+          ]);
+        } else {
+          // No audio at all – keep video-only stream
+          stream = new MediaStream(stream.getVideoTracks());
+        }
+      } catch (audioErr) {
+        console.warn('[WebNote] Audio mixing failed, using video-only stream:', audioErr);
+        stream = new MediaStream(stream.getVideoTracks());
+      }
+    } else {
+      // No audio at all requested
+      stream = new MediaStream(stream.getVideoTracks());
+    }
+
+    // Stop recording if user clicks the browser's "Stop sharing" button
+    stream.getVideoTracks()[0].addEventListener('ended', () => stopRecording());
+
+    recordedChunks = [];
+
+    // Prefer WebM with VP9 or VP8
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9'
+      : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+        ? 'video/webm;codecs=vp8'
+        : 'video/webm';
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = () => saveRecording();
+    mediaRecorder.start(1000); // collect data every 1s
+
+    showRecordingPill();
+  }
+
+  function showRecordingPill() {
+    const pill = document.createElement('div');
+    pill.className = 'wn-rec-pill';
+    pill.innerHTML = `
+      <span class="wn-rec-dot"></span>
+      <span class="wn-rec-timer">0:00</span>
+      <button class="wn-rec-stop-btn" title="Aufnahme stoppen">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        Stopp
+      </button>
+    `;
+    shadowRoot.appendChild(pill);
+
+    // Animate in
+    requestAnimationFrame(() => pill.classList.add('wn-rec-pill-in'));
+
+    timerInterval = setInterval(() => {
+      secondsElapsed++;
+      const m = Math.floor(secondsElapsed / 60);
+      const s = String(secondsElapsed % 60).padStart(2, '0');
+      const timerEl = shadowRoot.querySelector('.wn-rec-timer');
+      if (timerEl) timerEl.textContent = `${m}:${s}`;
+    }, 1000);
+
+    pill.querySelector('.wn-rec-stop-btn').onclick = () => stopRecording();
+  }
+
+  function stopRecording() {
+    clearInterval(timerInterval);
+    const pill = shadowRoot.querySelector('.wn-rec-pill');
+    if (pill) {
+      pill.classList.add('wn-rec-pill-out');
+      setTimeout(() => pill.remove(), 400);
+    }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+  }
+
+  function saveRecording() {
+    if (recordedChunks.length === 0) return;
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `webnote-rec-${Date.now()}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    showWnToast('Aufnahme gespeichert ✓');
+  }
+}
+
+// ── Scrollable / Full-Page Screenshot ─────────────────────────────────────
+function startScrollableScreenshot() {
+  const container = document.querySelector('#webnote-shadow-host');
+  if (!container) return;
+  const shadowRoot = container.shadowRoot;
+
+  // Prevent duplicate
+  if (shadowRoot.querySelector('.wn-scroll-pick-overlay') || shadowRoot.querySelector('.wn-scroll-progress')) return;
+
+  // ── Destination picker ────────────────────────────────────────────────────
+  const pickOverlay = document.createElement('div');
+  pickOverlay.className = 'wn-scroll-pick-overlay wn-rec-pick-overlay'; // reuse same card styles
+  pickOverlay.innerHTML = `
+    <div class="wn-rec-pick-card">
+      <div class="wn-rec-pick-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 8v8"/><path d="m9 11 3-3 3 3"/><path d="m9 16 3 3 3-3"/></svg>
+        Scrollable Screenshot
+      </div>
+      <p class="wn-rec-pick-sub">Die gesamte Seite wird von oben nach unten aufgenommen und als ein Bild zusammengesetzt.</p>
+      <div class="wn-rec-audio-section">
+        <div class="wn-rec-audio-heading">Ziel</div>
+        <label class="wn-rec-audio-label wn-ss-dest-label wn-ss-dest-active" data-dest="download">
+          <input type="radio" name="wn-ss-dest" value="download" checked>
+          <span class="wn-rec-audio-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </span>
+          Als Datei speichern
+        </label>
+        <label class="wn-rec-audio-label wn-ss-dest-label" data-dest="clipboard">
+          <input type="radio" name="wn-ss-dest" value="clipboard">
+          <span class="wn-rec-audio-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+          </span>
+          In Zwischenablage kopieren
+        </label>
+      </div>
+      <div class="wn-rec-pick-actions">
+        <button class="wn-rec-pick-btn wn-rec-pick-cancel">Abbrechen</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-start">Screenshot starten</button>
+      </div>
+    </div>
+  `;
+  shadowRoot.appendChild(pickOverlay);
+
+  // Highlight active radio label
+  pickOverlay.querySelectorAll('input[name="wn-ss-dest"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      pickOverlay.querySelectorAll('.wn-ss-dest-label').forEach(l => l.classList.remove('wn-ss-dest-active'));
+      radio.closest('.wn-ss-dest-label').classList.add('wn-ss-dest-active');
+    });
+  });
+
+  pickOverlay.querySelector('.wn-rec-pick-cancel').onclick = () => pickOverlay.remove();
+  pickOverlay.querySelector('.wn-rec-pick-start').onclick = () => {
+    const dest = pickOverlay.querySelector('input[name="wn-ss-dest"]:checked').value;
+    pickOverlay.remove();
+    runScrollCapture(dest);
+  };
+
+  // ── Capture logic ─────────────────────────────────────────────────────────
+  function runScrollCapture(dest) {
+    const totalH = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight
+    );
+    const viewH = window.innerHeight;
+    const viewW = window.innerWidth;
+    const dpr = window.devicePixelRatio || 1;
+    const origScrollY = window.scrollY;
+    const hostEl = document.querySelector('#webnote-shadow-host');
+
+    // ── Progress bar ──────────────────────────────────────────────────────────
+    const progress = document.createElement('div');
+    progress.className = 'wn-scroll-progress';
+    progress.innerHTML = `
+      <div class="wn-scroll-progress-bar" id="wn-scroll-bar"></div>
+      <span class="wn-scroll-progress-label" id="wn-scroll-label">Scrollable Screenshot… 0%</span>
+    `;
+    shadowRoot.appendChild(progress);
+
+    const updateProgress = (pct) => {
+      const bar = shadowRoot.querySelector('#wn-scroll-bar');
+      const label = shadowRoot.querySelector('#wn-scroll-label');
+      if (bar) bar.style.width = pct + '%';
+      if (label) label.textContent = `Scrollable Screenshot… ${Math.round(pct)}%`;
+    };
+
+    (async () => {
+      const frames = [];
+      let y = 0;
+      const steps = Math.ceil(totalH / viewH);
+      let step = 0;
+
+      window.scrollTo(0, 0);
+      await delay(300);
+
+      while (y < totalH) {
+        window.scrollTo(0, y);
+        await delay(250);
+
+        if (hostEl) hostEl.style.display = 'none';
+        await delay(50);
+
+        const dataUrl = await new Promise(resolve => {
+          chrome.runtime.sendMessage({ action: 'CAPTURE_VISIBLE' }, res => {
+            resolve(res && res.dataUrl ? res.dataUrl : null);
+          });
+        });
+
+        if (hostEl) hostEl.style.display = '';
+
+        if (dataUrl) frames.push({ dataUrl, offsetY: y });
+
+        step++;
+        updateProgress(Math.min(91, (step / steps) * 90));
+        y += viewH;
+      }
+
+      window.scrollTo(0, origScrollY);
+      updateProgress(92);
+
+      if (frames.length === 0) {
+        const prog = shadowRoot.querySelector('.wn-scroll-progress');
+        if (prog) prog.remove();
+        return;
+      }
+
+      chrome.runtime.sendMessage({ action: 'STITCH_SCREENSHOTS', frames, totalH, viewH, viewW, dpr }, async res => {
+        const prog = shadowRoot.querySelector('.wn-scroll-progress');
+        if (prog) { prog.classList.add('wn-scroll-progress-done'); setTimeout(() => prog.remove(), 800); }
+
+        if (!res || !res.dataUrl) { console.error('[WebNote] Stitching failed'); return; }
+
+        if (dest === 'clipboard') {
+          try {
+            // dataURL → Blob → ClipboardItem
+            const parts = res.dataUrl.split(';base64,');
+            const contentType = parts[0].split(':')[1];
+            const raw = atob(parts[1]);
+            const arr = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+            const blob = new Blob([arr], { type: contentType });
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+            showWnToast('Scrollable Screenshot in Zwischenablage kopiert ✓');
+          } catch (clipErr) {
+            console.error('[WebNote] Clipboard write failed:', clipErr);
+            // Fallback to download
+            downloadDataUrl(res.dataUrl);
+          }
+        } else {
+          downloadDataUrl(res.dataUrl);
+          showWnToast('Scrollable Screenshot gespeichert ✓');
+        }
+      });
+    })();
+  }
+
+  function downloadDataUrl(dataUrl) {
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `webnote-fullpage-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// ── Shared toast used by Video & ScrollSS ──────────────────────────────────
+function showWnToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:12px 24px;border-radius:100px;z-index:2147483647;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,0.3);white-space:nowrap;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = '0.3s'; setTimeout(() => t.remove(), 300); }, 2500);
+}
+
 })();

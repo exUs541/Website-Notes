@@ -93,6 +93,52 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return true; // async
   }
+
+  if (msg.action === 'STITCH_SCREENSHOTS') {
+    (async () => {
+      try {
+        const { frames, totalH, viewH, viewW, dpr } = msg;
+        const canvasW = Math.round(viewW * dpr);
+        const canvasH = Math.round(totalH * dpr);
+        const canvas = new OffscreenCanvas(canvasW, canvasH);
+        const ctx = canvas.getContext('2d');
+
+        for (const frame of frames) {
+          const blob = dataURLToBlob(frame.dataUrl);
+          const bitmap = await createImageBitmap(blob);
+
+          // How much of this frame is "new" content (avoid double-drawing the overlap
+          // on the last strip which may be shorter than a full viewport)
+          const drawH = Math.min(viewH, totalH - frame.offsetY);
+          const srcH = Math.round(drawH * dpr);
+          const destY = Math.round(frame.offsetY * dpr);
+
+          ctx.drawImage(
+            bitmap,
+            0, 0, canvasW, srcH,      // source: full width, only the valid strip
+            0, destY, canvasW, srcH   // dest: correct Y position
+          );
+          bitmap.close();
+        }
+
+        const resultBlob = await canvas.convertToBlob({ type: 'image/png' });
+        const arrayBuffer = await resultBlob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        const len = bytes.byteLength;
+        const chunkSize = 65536;
+        for (let i = 0; i < len; i += chunkSize) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        const base64 = btoa(binary);
+        sendResponse({ dataUrl: `data:image/png;base64,${base64}` });
+      } catch (e) {
+        console.error('[WebNote] Stitch error:', e);
+        sendResponse({ error: String(e) });
+      }
+    })();
+    return true; // async
+  }
 });
 
 // Update badge when switching tabs
