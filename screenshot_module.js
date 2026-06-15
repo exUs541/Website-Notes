@@ -7,7 +7,11 @@ function startScreenshotMode() {
   
   // Remove existing if any
   const old = shadow.querySelector('.wn-ss-overlay');
-  if (old) old.remove();
+  if (old) {
+    const closeBtn = old.querySelector('.wn-ss-close');
+    if (closeBtn) closeBtn.click();
+    else old.remove();
+  }
 
   const overlay = document.createElement('div');
   overlay.className = 'wn-ss-overlay';
@@ -44,6 +48,20 @@ function startScreenshotMode() {
     clipBtn.classList.toggle('active', useClipboard);
   };
 
+  const removeOverlay = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKeyDown);
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      e.preventDefault();
+      removeOverlay();
+    }
+  };
+  document.addEventListener('keydown', onKeyDown);
+
   const setMode = (m) => {
     mode = m;
     tools.forEach(t => t.classList.toggle('active', t.dataset.m === m));
@@ -54,7 +72,7 @@ function startScreenshotMode() {
   };
 
   tools.forEach(t => t.onclick = (e) => { e.stopPropagation(); setMode(t.dataset.m); });
-  overlay.querySelector('.wn-ss-close').onclick = (e) => { e.stopPropagation(); overlay.remove(); };
+  overlay.querySelector('.wn-ss-close').onclick = (e) => { e.stopPropagation(); removeOverlay(); };
 
   let isDragging = false, sX, sY;
 
@@ -124,7 +142,7 @@ function startScreenshotMode() {
   }
 
   function doCapture(x, y, w, h) {
-    overlay.remove();
+    removeOverlay();
     // Tiny delay to ensure overlay is gone from the screenshot
     setTimeout(() => {
       const isFullscreen = (x === undefined || y === undefined);

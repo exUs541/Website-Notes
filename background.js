@@ -35,6 +35,29 @@ function dataURLToBlob(dataURL) {
   return new Blob([uInt8Array], { type: contentType });
 }
 
+// Convert a Blob to dataURL in a call stack size safe way
+async function blobToDataURL(blob) {
+  if (typeof FileReader !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  // Fallback chunked conversion with stack-safe chunk size (8192)
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  const chunkSize = 8192;
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return `data:${blob.type};base64,${btoa(binary)}`;
+}
+
 // ── Messages & Badge ────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'UPDATE_BADGE') {
@@ -43,6 +66,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const text = msg.count > 0 ? String(msg.count) : '';
     chrome.action.setBadgeText({ text, tabId });
     chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
+  }
+
+  if (msg.action === 'DOWNLOAD_FILE') {
+    chrome.downloads.download({
+      url: msg.url,
+      filename: msg.filename,
+      saveAs: true
+    }, (downloadId) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse({ success: true, downloadId });
+      }
+    });
+    return true; // async
   }
 
   if (msg.action === 'CAPTURE_VISIBLE') {
@@ -69,17 +107,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             ctx.drawImage(bitmap, rx, ry, rw, rh, 0, 0, rw, rh);
             
             const croppedBlob = await canvas.convertToBlob({ type: 'image/png' });
-            const arrayBuffer = await croppedBlob.arrayBuffer();
-            const bytes = new Uint8Array(arrayBuffer);
-            let binary = '';
-            const len = bytes.byteLength;
-            const chunkSize = 65536;
-            for (let i = 0; i < len; i += chunkSize) {
-              const chunk = bytes.subarray(i, i + chunkSize);
-              binary += String.fromCharCode.apply(null, chunk);
-            }
-            const base64 = btoa(binary);
-            const croppedDataUrl = `data:image/png;base64,${base64}`;
+            const croppedDataUrl = await blobToDataURL(croppedBlob);
             
             sendResponse({ dataUrl: croppedDataUrl });
           } catch (e) {
@@ -122,16 +150,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         const resultBlob = await canvas.convertToBlob({ type: 'image/png' });
-        const arrayBuffer = await resultBlob.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = '';
-        const len = bytes.byteLength;
-        const chunkSize = 65536;
-        for (let i = 0; i < len; i += chunkSize) {
-          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-        }
-        const base64 = btoa(binary);
-        sendResponse({ dataUrl: `data:image/png;base64,${base64}` });
+        const stitchedDataUrl = await blobToDataURL(resultBlob);
+        sendResponse({ dataUrl: stitchedDataUrl });
       } catch (e) {
         console.error('[WebNote] Stitch error:', e);
         sendResponse({ error: String(e) });
