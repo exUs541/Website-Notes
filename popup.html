@@ -126,12 +126,35 @@
     input:checked + .slider:before {
       transform: translateX(16px);
     }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+    }
+    .version-text {
+      color: #6b7280;
+      font-weight: 500;
+    }
+    .feedback-link {
+      color: #6366f1;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.15s ease;
+    }
+    .feedback-link:hover {
+      color: #4f46e5;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <img src="icons/icon48.png">
-    <h2>WebNote <span id="version" class="version-badge">v1.0.0</span></h2>
+    <h2>WebNote</h2>
   </div>
   <div class="stats">
     <div class="stat-item">
@@ -160,6 +183,10 @@
   <button id="add-note" class="btn btn-primary">Add Note to Page</button>
   <button id="toggle-toolbar" class="btn btn-secondary">Toggle Toolbar</button>
   <button id="open-dashboard" class="btn btn-secondary">Open Dashboard</button>
+  <div class="footer">
+    <span id="version" class="version-text">v2.1.1</span>
+    <a href="#" id="feedback-link" class="feedback-link">Feedback</a>
+  </div>
   <script src="popup.js"></script>
 </body>
 </html>

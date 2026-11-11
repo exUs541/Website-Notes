@@ -21,48 +21,80 @@ async function updateStats() {
   document.getElementById('bubble-opacity-val').textContent = `${bubbleOpacity}%`;
 }
 
+function isRestrictedTab(tab) {
+  if (!tab || !tab.url) return false;
+  const u = tab.url;
+  return u.startsWith('chrome://') || u.startsWith('chrome-extension://') || u.startsWith('about:') || u.includes('chrome.google.com/webstore') || u.includes('chromewebstore.google.com');
+}
+
 document.getElementById('add-note').onclick = async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+    if (isRestrictedTab(tab)) {
+      alert("WebNote kann auf Chrome-Systemseiten oder im Web Store aus Sicherheitsgründen nicht verwendet werden.");
+      return;
+    }
     
     // Inject script manually just in case
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['content.js']
-    });
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      });
+    } catch (_) { }
 
     chrome.tabs.sendMessage(tab.id, { action: "ADD_NOTE" }, (response) => {
       if (chrome.runtime.lastError) {
-        alert("Fehler: Konnte Seite nicht erreichen. Bitte Seite neu laden.");
+        alert("Hinweis: Bitte laden Sie die Seite einmal neu, um WebNote zu aktivieren.");
       } else {
         window.close();
       }
     });
   } catch (err) {
-    console.error("Popup error:", err);
+    console.warn("Popup action skipped:", err.message);
   }
 };
 
 document.getElementById('toggle-toolbar').onclick = async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['content.js']
-    });
+    if (!tab) return;
+    if (isRestrictedTab(tab)) {
+      alert("WebNote kann auf Chrome-Systemseiten oder im Web Store aus Sicherheitsgründen nicht verwendet werden.");
+      return;
+    }
+
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      });
+    } catch (_) { }
 
     chrome.tabs.sendMessage(tab.id, { action: "TOGGLE_TOOLBAR" }, () => {
-      window.close();
+      if (chrome.runtime.lastError) {
+        alert("Hinweis: Bitte laden Sie die Seite einmal neu, um WebNote zu aktivieren.");
+      } else {
+        window.close();
+      }
     });
   } catch (err) {
-    console.error("Popup error:", err);
+    console.warn("Popup action skipped:", err.message);
   }
 };
 
 document.getElementById('open-dashboard').onclick = () => {
   chrome.runtime.openOptionsPage();
 };
+
+const feedbackEl = document.getElementById('feedback-link');
+if (feedbackEl) {
+  feedbackEl.onclick = (e) => {
+    e.preventDefault();
+    window.open('mailto:feedback@webnote.app?subject=WebNote%20Feedback', '_blank');
+  };
+}
 
 document.getElementById('auto-show-fab').onchange = async (e) => {
   const autoShow = e.target.checked;

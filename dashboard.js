@@ -35,18 +35,34 @@ function renderNotes() {
     const card = document.createElement('div');
     card.className = 'note-card';
     const hiddenBadge = note.hidden ? ' <span class="hidden-badge">(Hidden)</span>' : '';
+    const scope = note.urlScope || 'exact';
+    const targetJumpUrl = `${note.url}#webnote-jump=${note.id}`;
+
     card.innerHTML = `
       <div class="meta">
-        <a href="${note.url}" target="_blank" title="Go to note source page">${note.url}</a>
+        <a href="${targetJumpUrl}" target="_blank" title="Jump to note placement on webpage">${note.url}</a>
         ${hiddenBadge}
       </div>
       <div class="body" contenteditable="true" spellcheck="true" title="Click to edit content">${note.content || ''}</div>
       <div class="footer">
+        <select class="dash-scope-select" data-id="${note.id}" title="Set URL Scope">
+          <option value="exact" ${scope === 'exact' ? 'selected' : ''}>Exact Page</option>
+          <option value="path" ${scope === 'path' ? 'selected' : ''}>Same Path</option>
+          <option value="domain" ${scope === 'domain' ? 'selected' : ''}>Entire Domain</option>
+        </select>
+        <a href="${targetJumpUrl}" target="_blank" class="jump-btn" title="Open page and scroll to note">Jump ➔</a>
         <button class="delete-btn" data-id="${note.id}">Delete</button>
       </div>
     `;
     card.querySelector('.delete-btn').onclick = () => deleteNote(note.id);
-    
+
+    const scopeSel = card.querySelector('.dash-scope-select');
+    scopeSel.onchange = async (e) => {
+      const newScope = e.target.value;
+      note.urlScope = newScope;
+      await chrome.storage.local.set({ notes });
+    };
+
     // Save inline editing changes on blur
     const bodyEl = card.querySelector('.body');
     bodyEl.onblur = async () => {
@@ -56,7 +72,7 @@ function renderNotes() {
         await chrome.storage.local.set({ notes });
       }
     };
-    
+
     grid.appendChild(card);
   });
 }

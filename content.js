@@ -118,18 +118,44 @@ const HL_COLORS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#ddd6fe', '#fed7
 
 let activeHlColor = '#fef08a';
 
-// ── URL Helpers ──────────────────────────────────────────────────────────────
+// ── URL Helpers & Matching ──────────────────────────────────────────────────
 function normUrl(u) {
   try { const x = new URL(u); x.hash = ''; return x.toString().replace(/\/$/, ''); }
   catch (_) { return u; }
 }
 
+function isUrlMatch(note, currentUrlStr) {
+  if (!note || !note.url) return false;
+  const targetUrl = normUrl(note.url);
+  const curUrl = normUrl(currentUrlStr || location.href);
+  const scope = note.urlScope || 'exact';
+
+  if (scope === 'exact') {
+    return targetUrl === curUrl;
+  }
+
+  try {
+    const t = new URL(note.url);
+    const c = new URL(currentUrlStr || location.href);
+
+    if (scope === 'domain') {
+      return t.hostname === c.hostname;
+    }
+    if (scope === 'path') {
+      return t.origin === c.origin && t.pathname.replace(/\/$/, '') === c.pathname.replace(/\/$/, '');
+    }
+  } catch (_) {}
+
+  return targetUrl === curUrl;
+}
+
 // ── Note Migration (old schema → new schema) ──────────────────────────────────
 function migrateNote(note) {
-  // Tags
+  // Tags & Scope
   if (!note.tags) note.tags = [];
   if (!note.title) note.title = 'Notiz';
   if (note.color === undefined) note.color = null;
+  if (!note.urlScope) note.urlScope = 'exact';
 
   // Old notes had pinnedToSelector (element-pinning) - reset them to safe viewport coords
   if (note.pinnedToSelector !== undefined || note.pinned === undefined) {
@@ -166,10 +192,10 @@ async function init() {
     let stateChanged = false;
 
     if (!autoShow) {
-      const cur = normUrl(location.href);
-      const hasContent = notes.some(n => normUrl(n.url) === cur) || 
-                         highlights.some(h => normUrl(h.url) === cur) || 
-                         drawings.some(d => normUrl(d.url) === cur);
+      const cur = location.href;
+      const hasContent = notes.some(n => isUrlMatch(n, cur)) || 
+                         highlights.some(h => normUrl(h.url) === normUrl(cur)) || 
+                         drawings.some(d => normUrl(d.url) === normUrl(cur));
       
       if (!hasContent) {
         toolbarState.hidden = true;
@@ -177,10 +203,10 @@ async function init() {
       }
     } else {
       // If auto-showing on a clean page, we might want to force it minimized
-      const cur = normUrl(location.href);
-      const hasContent = notes.some(n => normUrl(n.url) === cur) || 
-                         highlights.some(h => normUrl(h.url) === cur) || 
-                         drawings.some(d => normUrl(d.url) === cur);
+      const cur = location.href;
+      const hasContent = notes.some(n => isUrlMatch(n, cur)) || 
+                         highlights.some(h => normUrl(h.url) === normUrl(cur)) || 
+                         drawings.some(d => normUrl(d.url) === normUrl(cur));
       if (!hasContent) {
         toolbarState.min = true; // Force icon mode on fresh pages
       }
@@ -200,6 +226,8 @@ async function init() {
     updateBadge();
     window.addEventListener('scroll', updatePinnedPositions, { passive: true });
     updatePinnedPositions();
+    checkUrlJump();
+    window.addEventListener('hashchange', checkUrlJump);
     console.log(`[WebNote] v${chrome.runtime.getManifest().version} ready`);
   } catch (e) {
     console.error('[WebNote] init failed', e);
@@ -227,23 +255,37 @@ function updatePinnedPositions() {
 
 // ── UI Shell ──────────────────────────────────────────────────────────────────
 function injectUI() {
+  const parent = document.body || document.documentElement;
+  if (!parent) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => injectUI(), { once: true });
+    }
+    return;
+  }
+
   const ex = document.querySelector('#webnote-shadow-host');
   let host;
   if (ex) {
     host = ex;
-    host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    if (host && host.style) {
+      host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    }
     shadow = ex.shadowRoot || ex.attachShadow({ mode: 'open' });
   } else {
     host = document.createElement('div');
     host.id = 'webnote-shadow-host';
-    host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
-    document.body.appendChild(host);
+    if (host && host.style) {
+      host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    }
+    parent.appendChild(host);
     shadow = host.attachShadow({ mode: 'open' });
   }
 
-  host.style.setProperty('--webnote-bubble-opacity', bubbleOpacity / 100);
+  if (host && host.style) {
+    host.style.setProperty('--webnote-bubble-opacity', bubbleOpacity / 100);
+  }
 
-  if (shadow.querySelector('#webnote-drawbar')) return;
+  if (!shadow || shadow.querySelector('#webnote-drawbar')) return;
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
@@ -491,6 +533,73 @@ function injectUI() {
   setupDrawingBoard(svgOverlay, drawBar);
 }
 
+// ── Note Placement Jump ───────────────────────────────────────────────────────
+function jumpToNote(noteId) {
+  if (!shadow) return;
+  const note = notes.find(n => String(n.id) === String(noteId));
+  if (!note) return;
+
+  if (note.hidden) {
+    note.hidden = false;
+    saveNotes();
+    renderNote(note);
+    updateSidebarList();
+    updateBadge();
+  }
+
+  if (note.displayMode !== 'full') {
+    note.displayMode = 'full';
+    saveNotes();
+  }
+
+  let el = shadow.querySelector(`#note-${note.id}`);
+  if (!el) {
+    renderNote(note);
+    el = shadow.querySelector(`#note-${note.id}`);
+  }
+  if (el) {
+    applyStyle(el, note);
+    positionNote(el, note);
+
+    const targetY = note.pinned ? note.pageY : (note.y + window.scrollY);
+    const targetX = note.pinned ? note.pageX : (note.x + window.scrollX);
+
+    window.scrollTo({
+      top: Math.max(0, targetY - 100),
+      left: Math.max(0, targetX - 100),
+      behavior: 'smooth'
+    });
+
+    el.classList.remove('wn-jump-highlight');
+    void el.offsetWidth; // force reflow
+    el.classList.add('wn-jump-highlight');
+    setTimeout(() => {
+      if (el) el.classList.remove('wn-jump-highlight');
+    }, 2000);
+
+    const titleInp = el.querySelector('.t-inp');
+    if (titleInp) titleInp.focus();
+  }
+}
+
+function checkUrlJump() {
+  const hash = location.hash;
+  const search = location.search;
+  let targetId = null;
+
+  if (hash && hash.includes('webnote-jump=')) {
+    const m = hash.match(/webnote-jump=([^&]+)/);
+    if (m) targetId = m[1];
+  } else if (search && search.includes('webnote_jump=')) {
+    const m = search.match(/webnote_jump=([^&]+)/);
+    if (m) targetId = m[1];
+  }
+
+  if (targetId) {
+    setTimeout(() => jumpToNote(targetId), 400);
+  }
+}
+
 // ── Note Creation ─────────────────────────────────────────────────────────────
 function createNote(opts = {}) {
   const vx = Math.max(20, Math.min(opts.x ?? 60, (window.innerWidth || 800) - 310));
@@ -498,6 +607,7 @@ function createNote(opts = {}) {
   const note = {
     id: Date.now().toString(),
     url: normUrl(location.href),
+    urlScope: opts.urlScope || 'exact',
     title: opts.title || 'New Note',
     content: opts.content || '',
     tags: opts.tags || [],
@@ -537,6 +647,8 @@ function noteHTML(note) {
     `<span class="tag-chip">${t}<button class="tag-rm" data-t="${t}">×</button></span>`
   ).join('');
 
+  const scopeLabel = (note.urlScope === 'domain') ? 'Domain' : ((note.urlScope === 'path') ? 'Path' : 'Exact');
+
   return `
   <div class="nh">
     <div class="nh-l">
@@ -548,6 +660,14 @@ function noteHTML(note) {
       <div class="dp-wrap">
         <button class="icon-btn c-btn" title="Background Color">${ICONS.palette}</button>
         <div class="dp nc-dp hidden">${nc}</div>
+      </div>
+      <div class="dp-wrap">
+        <button class="icon-btn scope-btn-toggle" title="URL Scope: ${scopeLabel}">${ICONS.monitor}</button>
+        <div class="dp scope-dp hidden">
+          <div class="scope-opt ${note.urlScope === 'exact' ? 'active' : ''}" data-s="exact">Exact Page</div>
+          <div class="scope-opt ${note.urlScope === 'path' ? 'active' : ''}" data-s="path">Same Path</div>
+          <div class="scope-opt ${note.urlScope === 'domain' ? 'active' : ''}" data-s="domain">Entire Domain</div>
+        </div>
       </div>
       <button class="icon-btn dup-btn" title="Duplicate">${ICONS.duplicate}</button>
       <button class="icon-btn cp-btn" title="Compact">${ICONS.compact}</button>
@@ -681,6 +801,24 @@ function bindEvents(el, note) {
     applyStyle(el, note);
     q('.nc-dp').classList.add('hidden');
     saveNotes();
+  });
+
+  // ── URL Scope ──
+  const scopeBtn = q('.scope-btn-toggle');
+  if (scopeBtn) {
+    scopeBtn.onclick = e => { e.stopPropagation(); closeDropdowns(); q('.scope-dp').classList.toggle('hidden'); };
+  }
+  qa('.scope-opt').forEach(opt => opt.onclick = e => {
+    e.stopPropagation();
+    note.urlScope = opt.dataset.s;
+    q('.scope-dp').classList.add('hidden');
+    const scopeLbl = (note.urlScope === 'domain') ? 'Domain' : ((note.urlScope === 'path') ? 'Path' : 'Exact');
+    if (scopeBtn) scopeBtn.title = `URL Scope: ${scopeLbl}`;
+    qa('.scope-opt').forEach(o => o.classList.toggle('active', o.dataset.s === note.urlScope));
+    saveNotes();
+    updateBadge();
+    updateSidebarList();
+    renderPageNotes();
   });
 
   // ── Tags ──
@@ -1065,8 +1203,8 @@ function updateSidebarList(query = '') {
   const list = shadow.querySelector('.sb-notes');
   if (!list) return;
   const q = query.toLowerCase();
-  const cur = normUrl(location.href);
-  let visible = notes.filter(n => normUrl(n.url) === cur && (
+  const cur = location.href;
+  let visible = notes.filter(n => isUrlMatch(n, cur) && (
     !q ||
     n.title.toLowerCase().includes(q) ||
     n.content.replace(/<[^>]+>/g, '').toLowerCase().includes(q) ||
@@ -1169,6 +1307,7 @@ function updateSidebarList(query = '') {
       item.className = 'sb-item' + (note.hidden ? ' hidden-note' : '');
       item.innerHTML = `
         <div class="sb-item-actions">
+          <div class="sb-item-action jump" title="Jump to placement">${ICONS.target}</div>
           ${actionHtml}
           <div class="sb-item-action del" title="Delete">${ICONS.trash}</div>
         </div>
@@ -1178,15 +1317,16 @@ function updateSidebarList(query = '') {
 
       item.onclick = (e) => {
         if (e.target.closest('.sb-item-action')) return;
-        if (note.hidden) return;
-        if (note.displayMode !== 'full') {
-          note.displayMode = 'full';
-          const el = shadow.querySelector(`#note-${note.id}`);
-          if (el) { applyStyle(el, note); positionNote(el, note); } saveNotes();
-        }
-        const el = shadow.querySelector(`#note-${note.id}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        jumpToNote(note.id);
       };
+
+      const jumpBtn = item.querySelector('.jump');
+      if (jumpBtn) {
+        jumpBtn.onclick = (e) => {
+          e.stopPropagation();
+          jumpToNote(note.id);
+        };
+      }
 
       if (note.hidden) {
         const unhideBtn = item.querySelector('.unhide');
@@ -1198,6 +1338,7 @@ function updateSidebarList(query = '') {
             renderNote(note);
             updateSidebarList(query);
             updateBadge();
+            jumpToNote(note.id);
           };
         }
       } else {
@@ -1205,22 +1346,7 @@ function updateSidebarList(query = '') {
         if (editBtn) {
           editBtn.onclick = (e) => {
             e.stopPropagation();
-            if (note.displayMode !== 'full') {
-              note.displayMode = 'full';
-              saveNotes();
-              const el = shadow.querySelector(`#note-${note.id}`);
-              if (el) { applyStyle(el, note); positionNote(el, note); }
-            }
-            const el = shadow.querySelector(`#note-${note.id}`);
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              const titleInp = el.querySelector('.t-inp');
-              if (titleInp) {
-                titleInp.focus();
-                const len = titleInp.value.length;
-                titleInp.setSelectionRange(len, len);
-              }
-            }
+            jumpToNote(note.id);
           };
         }
       }
@@ -1242,15 +1368,15 @@ function updateSidebarList(query = '') {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function renderPageNotes() {
-  const cur = normUrl(location.href);
-  notes.filter(n => normUrl(n.url) === cur && !n.hidden).forEach(renderNote);
+  const cur = location.href;
+  notes.filter(n => isUrlMatch(n, cur) && !n.hidden).forEach(renderNote);
 }
 
 function saveNotes() { chrome.storage.local.set({ notes, rules, sidebarSort, sidebarGroup }); }
 
 function updateBadge() {
-  const cur = normUrl(location.href);
-  const count = notes.filter(n => normUrl(n.url) === cur && !n.hidden).length;
+  const cur = location.href;
+  const count = notes.filter(n => isUrlMatch(n, cur) && !n.hidden).length;
   try {
     chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => { });
   } catch (e) {
