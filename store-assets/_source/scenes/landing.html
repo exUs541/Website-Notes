@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit – Plan, track and ship work together</title>
+  <style>
+    :root { --ink: #0f172a; --muted: #5b6475; --line: #e5e8ef; --brand: #2563eb; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #fff; color: var(--ink); font: 16px/1.55 "Segoe UI", system-ui, sans-serif; }
+    .top { position: sticky; top: 0; z-index: 5; background: #fff; display: flex; align-items: center; gap: 30px; height: 56px; padding: 0 48px; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+    .logo { display: flex; align-items: center; gap: 9px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+    .logo i { width: 24px; height: 24px; border-radius: 50%; border: 5px solid var(--brand); border-right-color: #93c5fd; display: inline-block; }
+    .top nav { display: flex; gap: 22px; color: var(--muted); font-weight: 500; }
+    .sp { flex: 1; }
+    .ghost { color: var(--muted); }
+    .btn { display: inline-block; padding: 10px 18px; border-radius: 10px; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; }
+    .hero { display: grid; grid-template-columns: 1fr 430px; gap: 36px; padding: 52px 48px 28px; align-items: center; }
+    .pill { display: inline-block; padding: 5px 12px; border-radius: 999px; background: #eff6ff; color: var(--brand); font-weight: 700; font-size: 12px; letter-spacing: .02em; margin-bottom: 14px; }
+    h1 { margin: 0 0 14px; font-size: 46px; line-height: 1.07; letter-spacing: -.03em; font-weight: 800; }
+    .hero p { margin: 0 0 22px; font-size: 18px; color: var(--muted); max-width: 520px; }
+    form { display: flex; gap: 8px; }
+    .field { flex: 1; max-width: 330px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 15px; color: var(--ink); background: #fff; }
+    .sub { margin-top: 10px; font-size: 13px; color: #8a93a5; }
+    .board { border: 1px solid var(--line); border-radius: 16px; background: #f8fafc; padding: 16px; box-shadow: 0 20px 50px rgba(15,23,42,.08); }
+    .board h4 { margin: 0 0 12px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .col { background: #eef2f7; border-radius: 10px; padding: 8px; min-height: 150px; }
+    .col b { font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; display: block; margin: 2px 2px 8px; }
+    .task { background: #fff; border-radius: 8px; padding: 8px 9px; font-size: 12px; margin-bottom: 7px; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+    .task s { display: block; height: 5px; width: 60%; border-radius: 3px; background: #dbeafe; margin-top: 6px; }
+    .who { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+    .who span { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #f472b6, #fb923c); display: inline-block; }
+    .price { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 10px 48px 40px; }
+    .plan { border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+    .plan h3 { margin: 0; font-size: 15px; } .plan .n { font-size: 30px; font-weight: 800; letter-spacing: -.02em; margin: 6px 0; } .plan small { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="logo"><i></i>Orbit</div>
+    <nav><span>Product</span><span>Pricing</span><span>Customers</span><span>Docs</span></nav>
+    <div class="sp"></div><span class="ghost">Sign in</span><span class="btn" id="try">Start free trial</span>
+  </header>
+
+  <section class="hero">
+    <div>
+      <span class="pill">NEW · TEAM WORKSPACES</span>
+      <h1 id="h1">Plan, track and ship work together</h1>
+      <p id="sub">Orbit brings tasks, docs and deadlines into one calm workspace, so your team always knows what comes next.</p>
+      <form onsubmit="return false">
+        <div class="field" id="email">alex.martin@orbit-mail.com</div>
+        <span class="btn" id="cta">Get started</span>
+      </form>
+      <div class="sub">Free for teams up to 5 · No credit card required</div>
+      <div class="who" id="who"><span></span>Signed in as <b id="name">Alex Martin</b></div>
+    </div>
+    <div class="board">
+      <h4><span>Sprint 14</span><span>6 tasks</span></h4>
+      <div class="cols">
+        <div class="col"><b>To do</b><div class="task">Draft onboarding emails<s></s></div><div class="task">Fix mobile nav<s></s></div></div>
+        <div class="col"><b>In progress</b><div class="task">Pricing page redesign<s></s></div></div>
+        <div class="col"><b>Done</b><div class="task">Set up analytics<s></s></div><div class="task">Brand colors<s></s></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="price">
+    <div class="plan"><h3>Free</h3><div class="n">$0</div><small>For small teams getting started</small></div>
+    <div class="plan"><h3>Team</h3><div class="n">$12</div><small>per user / month</small></div>
+    <div class="plan"><h3>Business</h3><div class="n">$24</div><small>per user / month</small></div>
+  </section>
+
+  <script src="/ext/i18n.js"></script>
+  <script src="/ext/content.js"></script>
+</body>
+</html>
