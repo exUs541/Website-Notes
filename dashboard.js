@@ -1,3 +1,6 @@
+const I18n = window.WebNoteI18n;
+const t = I18n.t;
+
 let notes = [];
 let rules = { hiddenUrls: [] };
 
@@ -11,6 +14,45 @@ async function loadData() {
 function renderAll() {
   renderNotes();
   renderRules();
+}
+
+// ── Safe rendering helpers ───────────────────────────────────────────────
+// Note URLs, rules and note bodies can come from an imported file, so none of
+// them is placed into the page as trusted markup.
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Only web pages can be opened from a note; anything else (javascript:, data:, ...) is dropped.
+function safeUrl(url) {
+  try {
+    const u = new URL(String(url));
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '#';
+  } catch {
+    return '#';
+  }
+}
+
+// Notes hold the user's rich text. Keep the formatting, remove anything executable or remote.
+const BLOCKED_TAGS = 'script, style, iframe, object, embed, link, meta, base, form, svg, math';
+function sanitizeHtml(html) {
+  const doc = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
+  doc.body.querySelectorAll(BLOCKED_TAGS).forEach(el => el.remove());
+  doc.body.querySelectorAll('*').forEach(el => {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim().toLowerCase();
+      if (name.startsWith('on')) el.removeAttribute(attr.name);
+      else if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
+               !(value.startsWith('http:') || value.startsWith('https:') || value.startsWith('data:image/') || value.startsWith('#'))) {
+        el.removeAttribute(attr.name);
+      }
+    }
+    if (el.tagName === 'A') { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
+  });
+  return doc.body.innerHTML;
 }
 
 // Tab Switching
@@ -29,34 +71,51 @@ function renderNotes() {
   const query = document.getElementById('search-notes').value.toLowerCase();
   grid.innerHTML = '';
 
-  const filtered = notes.filter(n => n.content.toLowerCase().includes(query) || n.url.toLowerCase().includes(query));
+  const filtered = notes.filter(n => String(n.content || '').toLowerCase().includes(query) || String(n.url || '').toLowerCase().includes(query));
 
   filtered.forEach(note => {
     const card = document.createElement('div');
     card.className = 'note-card';
-    const hiddenBadge = note.hidden ? ' <span class="hidden-badge">(Hidden)</span>' : '';
+    const hiddenBadge = note.hidden ? ` <span class="hidden-badge">${escapeHtml(t('dashboard.hidden'))}</span>` : '';
+    const scope = note.urlScope || 'exact';
+    const baseUrl = safeUrl(note.url);
+    const targetJumpUrl = baseUrl === '#' ? '#' : `${baseUrl}#webnote-jump=${encodeURIComponent(note.id)}`;
+
     card.innerHTML = `
       <div class="meta">
-        <a href="${note.url}" target="_blank" title="Go to note source page">${note.url}</a>
+        <a href="${escapeHtml(targetJumpUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(t('dashboard.openAndJump'))}">${escapeHtml(note.url)}</a>
         ${hiddenBadge}
       </div>
-      <div class="body" contenteditable="true" spellcheck="true" title="Click to edit content">${note.content || ''}</div>
+      <div class="body" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="${escapeHtml(t('dashboard.noteText'))}" title="${escapeHtml(t('dashboard.clickToEdit'))}">${sanitizeHtml(note.content)}</div>
       <div class="footer">
-        <button class="delete-btn" data-id="${note.id}">Delete</button>
+        <select class="dash-scope-select" aria-label="${escapeHtml(t('dashboard.scopeLabel'))}" title="${escapeHtml(t('dashboard.scopeLabel'))}">
+          <option value="exact" ${scope === 'exact' ? 'selected' : ''}>${escapeHtml(t('dashboard.scopeExact'))}</option>
+          <option value="path" ${scope === 'path' ? 'selected' : ''}>${escapeHtml(t('dashboard.scopePath'))}</option>
+          <option value="domain" ${scope === 'domain' ? 'selected' : ''}>${escapeHtml(t('dashboard.scopeDomain'))}</option>
+        </select>
+        <a href="${escapeHtml(targetJumpUrl)}" target="_blank" rel="noopener noreferrer" class="jump-btn" title="${escapeHtml(t('dashboard.jumpTitle'))}">${escapeHtml(t('dashboard.jumpToNote'))}</a>
+        <button class="delete-btn">${escapeHtml(t('common.delete'))}</button>
       </div>
     `;
     card.querySelector('.delete-btn').onclick = () => deleteNote(note.id);
-    
+
+    const scopeSel = card.querySelector('.dash-scope-select');
+    scopeSel.onchange = async (e) => {
+      const newScope = e.target.value;
+      note.urlScope = newScope;
+      await chrome.storage.local.set({ notes });
+    };
+
     // Save inline editing changes on blur
     const bodyEl = card.querySelector('.body');
     bodyEl.onblur = async () => {
-      const newContent = bodyEl.innerHTML;
+      const newContent = sanitizeHtml(bodyEl.innerHTML);
       if (newContent !== note.content) {
         note.content = newContent;
         await chrome.storage.local.set({ notes });
       }
     };
-    
+
     grid.appendChild(card);
   });
 }
@@ -70,35 +129,48 @@ async function deleteNote(id) {
 }
 
 // Rules Render
+// (Event listeners instead of inline onclick="": extension pages forbid inline handlers
+// through their content security policy, so the old Remove button did nothing.)
 function renderRules() {
   const list = document.getElementById('rules-list');
   list.innerHTML = '';
   rules.hiddenUrls.forEach((rule, index) => {
     const item = document.createElement('li');
     item.className = 'rule-item';
-    item.innerHTML = `
-      <span>${rule}</span>
-      <button class="delete-btn" onclick="deleteRule(${index})">Remove</button>
-    `;
+
+    const label = document.createElement('span');
+    label.textContent = rule;
+    label.title = rule;
+
+    const remove = document.createElement('button');
+    remove.className = 'delete-btn';
+    remove.textContent = t('dashboard.remove');
+    remove.setAttribute('aria-label', t('dashboard.removeExclusion', { rule }));
+    remove.addEventListener('click', () => deleteRule(index));
+
+    item.append(label, remove);
     list.appendChild(item);
   });
 }
 
-window.deleteRule = async (index) => {
+async function deleteRule(index) {
   rules.hiddenUrls.splice(index, 1);
   await chrome.storage.local.set({ rules });
   renderRules();
-};
+}
 
-document.getElementById('add-rule').onclick = async () => {
+async function addRule() {
   const input = document.getElementById('new-rule');
-  if (input.value) {
-    rules.hiddenUrls.push(input.value);
+  const value = input.value.trim();
+  if (value && !rules.hiddenUrls.includes(value)) {
+    rules.hiddenUrls.push(value);
     await chrome.storage.local.set({ rules });
-    input.value = '';
     renderRules();
   }
-};
+  input.value = '';
+}
+document.getElementById('add-rule').onclick = addRule;
+document.getElementById('new-rule').addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); });
 
 // Export / Import
 document.getElementById('export-btn').onclick = () => {
@@ -109,6 +181,7 @@ document.getElementById('export-btn').onclick = () => {
   a.href = url;
   a.download = `webnote-export-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
+  URL.revokeObjectURL(url);
 };
 
 document.getElementById('import-trigger').onclick = () => document.getElementById('import-file').click();
@@ -120,16 +193,36 @@ document.getElementById('import-file').onchange = (e) => {
   reader.onload = async (event) => {
     try {
       const data = JSON.parse(event.target.result);
+      // Check the shape first so a wrong file cannot replace the user's notes with garbage.
+      if (data.notes !== undefined && !Array.isArray(data.notes)) throw new Error('notes must be a list');
+      if (data.rules !== undefined && !(data.rules && Array.isArray(data.rules.hiddenUrls))) throw new Error('rules are malformed');
+      if (!data.notes && !data.rules) throw new Error('nothing to import');
       if (data.notes) notes = data.notes;
       if (data.rules) rules = data.rules;
       await chrome.storage.local.set({ notes, rules });
       renderAll();
-      alert('Import successful!');
+      alert(t('dashboard.importOk'));
     } catch (err) {
-      alert('Error parsing file.');
+      alert(t('dashboard.importFail'));
+    } finally {
+      e.target.value = '';
     }
   };
   reader.readAsText(file);
 };
 
-loadData();
+// A language picked in the popup is applied here straight away, even while this page is open.
+I18n.onChange(() => {
+  I18n.apply(document);
+  renderAll();
+});
+
+(async () => {
+  try {
+    await I18n.init();
+    I18n.apply(document);
+    await loadData();
+  } finally {
+    document.documentElement.classList.remove('i18n-loading');
+  }
+})();

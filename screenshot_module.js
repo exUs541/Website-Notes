@@ -21,15 +21,15 @@ function startScreenshotMode() {
 
   overlay.innerHTML = `
     <div class="wn-ss-tools">
-      <button class="wn-ss-tool active" data-m="crop" title="Bereich auswählen">${ICONS.crop}</button>
-      <button class="wn-ss-tool" data-m="target" title="Element auswählen">${ICONS.target}</button>
-      <button class="wn-ss-tool" data-m="screen" title="Ganzes Fenster">${ICONS.monitor}</button>
+      <button class="wn-ss-tool active" data-m="crop" title="Select Area">${ICONS.crop}</button>
+      <button class="wn-ss-tool" data-m="target" title="Select Element">${ICONS.target}</button>
+      <button class="wn-ss-tool" data-m="screen" title="Full Window">${ICONS.monitor}</button>
       <div class="db-sep"></div>
-      <button class="wn-ss-tool wn-ss-clip" title="In Zwischenablage kopieren">${ICONS.clipboard}</button>
+      <button class="wn-ss-tool wn-ss-clip" title="Copy to Clipboard">${ICONS.clipboard}</button>
       <div class="db-sep"></div>
-      <button class="wn-ss-tool wn-ss-close" title="Abbrechen">${ICONS.close}</button>
+      <button class="wn-ss-tool wn-ss-close" title="Cancel">${ICONS.close}</button>
     </div>
-    <div class="wn-ss-hint">Bereich mit der Maus auswählen</div>
+    <div class="wn-ss-hint">Select an area with the mouse</div>
     <div class="wn-ss-area" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.1); pointer-events:none;"></div>
     <div class="wn-ss-target" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.2); pointer-events:none; z-index:2147483646;"></div>
   `;
@@ -65,8 +65,8 @@ function startScreenshotMode() {
   const setMode = (m) => {
     mode = m;
     tools.forEach(t => t.classList.toggle('active', t.dataset.m === m));
-    hint.textContent = m === 'crop' ? 'Bereich mit der Maus auswählen' : 
-                       m === 'target' ? 'Element anklicken' : 'Klicken für Vollbild';
+    hint.textContent = m === 'crop' ? 'Select an area with the mouse' : 
+                       m === 'target' ? 'Click on an element' : 'Click for full screen';
     areaEl.style.display = 'none';
     targetEl.style.display = 'none';
   };
@@ -173,7 +173,7 @@ function startScreenshotMode() {
         const blob = dataURLToBlob(dataUrl);
         const item = new ClipboardItem({ [blob.type]: blob });
         await navigator.clipboard.write([item]);
-        showToast('In Zwischenablage kopiert!');
+        showToast('Copied to clipboard!');
       } catch (err) {
         console.error('[WebNote] Clipboard error:', err);
         // Fallback: download if copy fails

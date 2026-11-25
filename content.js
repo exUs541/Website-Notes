@@ -4,6 +4,15 @@
   if (window.hasWebNoteInjected) return;
   window.hasWebNoteInjected = true;
 
+  // Language support: i18n.js is loaded right before this file (see manifest.json).
+  const I18n = window.WebNoteI18n;
+  const tr = I18n.t;
+  const escapeHtml = (v) => String(v ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  // Translated text for innerHTML templates (escaped).
+  const trh = (key, params) => escapeHtml(tr(key, params));
+
 const ICONS = {
   drag: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>`,
   vert: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="m13 16 4 4 4-4"/><path d="M17 20V4"/></svg>`,
@@ -77,6 +86,10 @@ let undoStack = [];
 let redoStack = [];
 let isEraserDragging = false;
 
+// Master switch (popup toggle, chrome.storage.local, on by default). While false WebNote adds
+// nothing to the page and ignores the keyboard, the context menu and the popup.
+let masterOn = true;
+
 function saveDrawingSnapshot() {
   const cur = normUrl(location.href);
   undoStack.push(JSON.stringify(drawings.filter(d => normUrl(d.url) === cur)));
@@ -104,32 +117,58 @@ function performRedo() {
 }
 
 const NOTE_COLORS = [
-  { v: null, bg: '#ffffff', label: 'Standard' },
-  { v: '#fef9c3', bg: '#fef9c3', label: 'Gelb' },
-  { v: '#dcfce7', bg: '#dcfce7', label: 'Grün' },
-  { v: '#dbeafe', bg: '#dbeafe', label: 'Blau' },
-  { v: '#fce7f3', bg: '#fce7f3', label: 'Rosa' },
-  { v: '#ede9fe', bg: '#ede9fe', label: 'Lila' },
-  { v: '#ffedd5', bg: '#ffedd5', label: 'Orange' },
-  { v: '#f1f5f9', bg: '#f1f5f9', label: 'Grau' },
+  { v: null, bg: '#ffffff', labelKey: 'color.default' },
+  { v: '#fef9c3', bg: '#fef9c3', labelKey: 'color.yellow' },
+  { v: '#dcfce7', bg: '#dcfce7', labelKey: 'color.green' },
+  { v: '#dbeafe', bg: '#dbeafe', labelKey: 'color.blue' },
+  { v: '#fce7f3', bg: '#fce7f3', labelKey: 'color.pink' },
+  { v: '#ede9fe', bg: '#ede9fe', labelKey: 'color.purple' },
+  { v: '#ffedd5', bg: '#ffedd5', labelKey: 'color.orange' },
+  { v: '#f1f5f9', bg: '#f1f5f9', labelKey: 'color.gray' },
 ];
 const TEXT_COLORS = ['#1e293b', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#ffffff'];
 const HL_COLORS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#ddd6fe', '#fed7aa', null];
 
 let activeHlColor = '#fef08a';
 
-// ── URL Helpers ──────────────────────────────────────────────────────────────
+// ── URL Helpers & Matching ──────────────────────────────────────────────────
 function normUrl(u) {
   try { const x = new URL(u); x.hash = ''; return x.toString().replace(/\/$/, ''); }
   catch (_) { return u; }
 }
 
+function isUrlMatch(note, currentUrlStr) {
+  if (!note || !note.url) return false;
+  const targetUrl = normUrl(note.url);
+  const curUrl = normUrl(currentUrlStr || location.href);
+  const scope = note.urlScope || 'exact';
+
+  if (scope === 'exact') {
+    return targetUrl === curUrl;
+  }
+
+  try {
+    const t = new URL(note.url);
+    const c = new URL(currentUrlStr || location.href);
+
+    if (scope === 'domain') {
+      return t.hostname === c.hostname;
+    }
+    if (scope === 'path') {
+      return t.origin === c.origin && t.pathname.replace(/\/$/, '') === c.pathname.replace(/\/$/, '');
+    }
+  } catch (_) {}
+
+  return targetUrl === curUrl;
+}
+
 // ── Note Migration (old schema → new schema) ──────────────────────────────────
 function migrateNote(note) {
-  // Tags
+  // Tags & Scope
   if (!note.tags) note.tags = [];
-  if (!note.title) note.title = 'Notiz';
+  if (!note.title) note.title = tr('note.fallbackTitle');
   if (note.color === undefined) note.color = null;
+  if (!note.urlScope) note.urlScope = 'exact';
 
   // Old notes had pinnedToSelector (element-pinning) - reset them to safe viewport coords
   if (note.pinnedToSelector !== undefined || note.pinned === undefined) {
@@ -151,6 +190,7 @@ function migrateNote(note) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   try {
+    await I18n.init(); // the language must be known before any text is built
     const data = await chrome.storage.local.get(['notes', 'highlights', 'rules', 'sidebarSort', 'sidebarGroup', 'drawings', 'toolbarState', 'autoShowFAB', 'bubbleOpacity']);
     notes = (data.notes || []).map(migrateNote);
     highlights = data.highlights || [];
@@ -166,10 +206,10 @@ async function init() {
     let stateChanged = false;
 
     if (!autoShow) {
-      const cur = normUrl(location.href);
-      const hasContent = notes.some(n => normUrl(n.url) === cur) || 
-                         highlights.some(h => normUrl(h.url) === cur) || 
-                         drawings.some(d => normUrl(d.url) === cur);
+      const cur = location.href;
+      const hasContent = notes.some(n => isUrlMatch(n, cur)) || 
+                         highlights.some(h => normUrl(h.url) === normUrl(cur)) || 
+                         drawings.some(d => normUrl(d.url) === normUrl(cur));
       
       if (!hasContent) {
         toolbarState.hidden = true;
@@ -177,10 +217,10 @@ async function init() {
       }
     } else {
       // If auto-showing on a clean page, we might want to force it minimized
-      const cur = normUrl(location.href);
-      const hasContent = notes.some(n => normUrl(n.url) === cur) || 
-                         highlights.some(h => normUrl(h.url) === cur) || 
-                         drawings.some(d => normUrl(d.url) === cur);
+      const cur = location.href;
+      const hasContent = notes.some(n => isUrlMatch(n, cur)) || 
+                         highlights.some(h => normUrl(h.url) === normUrl(cur)) || 
+                         drawings.some(d => normUrl(d.url) === normUrl(cur));
       if (!hasContent) {
         toolbarState.min = true; // Force icon mode on fresh pages
       }
@@ -200,10 +240,31 @@ async function init() {
     updateBadge();
     window.addEventListener('scroll', updatePinnedPositions, { passive: true });
     updatePinnedPositions();
+    checkUrlJump();
+    window.addEventListener('hashchange', checkUrlJump);
+    I18n.onChange(applyLanguage);
     console.log(`[WebNote] v${chrome.runtime.getManifest().version} ready`);
   } catch (e) {
     console.error('[WebNote] init failed', e);
   }
+}
+
+// ── Language ──────────────────────────────────────────────────────────────────
+// Re-labels everything already on the page when the language is changed in the popup.
+function applyLanguage() {
+  if (!shadow) return;
+  I18n.apply(shadow); // toolbar, sidebar and any open dialog
+
+  shadow.querySelectorAll('.webnote-sticky').forEach(el => {
+    const note = notes.find(n => `note-${n.id}` === el.id);
+    if (!note) return;
+    updateNoteTexts(el, note);
+    applyStyle(el, note); // refreshes the "Untitled" fallback of the floating icon
+  });
+
+  const search = shadow.querySelector('.sb-search');
+  updateSidebarList(search ? search.value : '');
+  document.querySelectorAll('.webnote-hl').forEach(span => { span.title = tr('highlight.tooltip'); });
 }
 
 // ── Pin Position System ────────────────────────────────────────────────────────
@@ -227,23 +288,37 @@ function updatePinnedPositions() {
 
 // ── UI Shell ──────────────────────────────────────────────────────────────────
 function injectUI() {
+  const parent = document.body || document.documentElement;
+  if (!parent) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => injectUI(), { once: true });
+    }
+    return;
+  }
+
   const ex = document.querySelector('#webnote-shadow-host');
   let host;
   if (ex) {
     host = ex;
-    host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    if (host && host.style) {
+      host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    }
     shadow = ex.shadowRoot || ex.attachShadow({ mode: 'open' });
   } else {
     host = document.createElement('div');
     host.id = 'webnote-shadow-host';
-    host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
-    document.body.appendChild(host);
+    if (host && host.style) {
+      host.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;pointer-events:none;overflow:visible;';
+    }
+    parent.appendChild(host);
     shadow = host.attachShadow({ mode: 'open' });
   }
 
-  host.style.setProperty('--webnote-bubble-opacity', bubbleOpacity / 100);
+  if (host && host.style) {
+    host.style.setProperty('--webnote-bubble-opacity', bubbleOpacity / 100);
+  }
 
-  if (shadow.querySelector('#webnote-drawbar')) return;
+  if (!shadow || shadow.querySelector('#webnote-drawbar')) return;
 
   const link = document.createElement('link');
   link.rel = 'stylesheet';
@@ -375,47 +450,47 @@ function injectUI() {
   }
 
   drawBar.innerHTML = `
-    <div class="db-min-icon" title="Open WebNote">${ICONS.highlighter}</div>
+    <div class="db-min-icon" data-i18n-title="toolbar.open">${ICONS.highlighter}</div>
     <div class="db-full">
-      <div class="db-drag-handle" title="Drag to Move">${ICONS.drag}</div>
-      <button class="db-tool db-toggle-dir" title="Change Orientation">${toolbarState.vert ? ICONS.horiz : ICONS.vert}</button>
+      <div class="db-drag-handle" data-i18n-title="toolbar.drag">${ICONS.drag}</div>
+      <button class="db-tool db-toggle-dir" data-i18n-title="toolbar.orientation">${toolbarState.vert ? ICONS.horiz : ICONS.vert}</button>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-list" title="All Notes (Sidebar)">${ICONS.list}</button>
-      <button class="db-tool db-btn-new" title="New Note">${ICONS.plus}</button>
+      <button class="db-tool db-btn-list" data-i18n-title="toolbar.allNotes">${ICONS.list}</button>
+      <button class="db-tool db-btn-new" data-i18n-title="toolbar.newNote">${ICONS.plus}</button>
       <div class="db-sep"></div>
-      <button class="db-tool active" data-tool="cursor" title="Mouse (Normal)">${ICONS.cursor}</button>
-      <button class="db-tool" data-tool="highlight" title="Highlight Text">${ICONS.highlighter}</button>
+      <button class="db-tool active" data-tool="cursor" data-i18n-title="toolbar.cursor">${ICONS.cursor}</button>
+      <button class="db-tool" data-tool="highlight" data-i18n-title="toolbar.highlight">${ICONS.highlighter}</button>
       <div class="db-sep"></div>
-      <button class="db-tool" data-tool="draw" title="Freehand Drawing">${ICONS.pen}</button>
+      <button class="db-tool" data-tool="draw" data-i18n-title="toolbar.draw">${ICONS.pen}</button>
       <div class="db-group-wrap">
-        <button class="db-tool has-submenu" id="db-shape-menu" data-tool="rect" title="Shapes">${ICONS.rect}</button>
+        <button class="db-tool has-submenu" id="db-shape-menu" data-tool="rect" data-i18n-title="toolbar.shapes">${ICONS.rect}</button>
         <div class="db-sub-menu hidden" id="db-shape-popup">
-          <button class="db-tool" data-tool="rect" title="Rectangle">${ICONS.rect}</button>
-          <button class="db-tool" data-tool="ellipse" title="Circle">${ICONS.circle}</button>
-          <button class="db-tool" data-tool="line" title="Line">${ICONS.line}</button>
-          <button class="db-tool" data-tool="arrow" title="Arrow">${ICONS.arrow}</button>
+          <button class="db-tool" data-tool="rect" data-i18n-title="toolbar.rect">${ICONS.rect}</button>
+          <button class="db-tool" data-tool="ellipse" data-i18n-title="toolbar.circle">${ICONS.circle}</button>
+          <button class="db-tool" data-tool="line" data-i18n-title="toolbar.line">${ICONS.line}</button>
+          <button class="db-tool" data-tool="arrow" data-i18n-title="toolbar.arrow">${ICONS.arrow}</button>
           <div class="db-shape-sep"></div>
-          <button class="db-tool" data-tool="censor-glass" title="Frosted Glass Blur">${ICONS.censorGlass}</button>
-          <button class="db-tool" data-tool="censor-solid" title="Redacted Blackout">${ICONS.censorSolid}</button>
+          <button class="db-tool" data-tool="censor-glass" data-i18n-title="toolbar.blur">${ICONS.censorGlass}</button>
+          <button class="db-tool" data-tool="censor-solid" data-i18n-title="toolbar.redact">${ICONS.censorSolid}</button>
         </div>
       </div>
       <div class="db-sep"></div>
       <div class="db-group-wrap">
-        <button class="db-tool has-submenu" id="db-sticker-menu" data-tool="sticker-star" title="Stickers">${ICONS.sticker}</button>
+        <button class="db-tool has-submenu" id="db-sticker-menu" data-tool="sticker-star" data-i18n-title="toolbar.stickers">${ICONS.sticker}</button>
         <div class="db-sub-menu hidden" id="db-sticker-popup" style="padding: 6px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-width: 140px;">
-          <button class="db-tool" data-tool="sticker-star" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Star">⭐</button>
-          <button class="db-tool" data-tool="sticker-thumb" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Thumbs Up">👍</button>
-          <button class="db-tool" data-tool="sticker-heart" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Heart">❤️</button>
-          <button class="db-tool" data-tool="sticker-check" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Checkmark">✅</button>
-          <button class="db-tool" data-tool="sticker-cross" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Cross">❌</button>
-          <button class="db-tool" data-tool="sticker-warn" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Warning">⚠️</button>
-          <button class="db-tool" data-tool="sticker-idea" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Idea">💡</button>
-          <button class="db-tool" data-tool="sticker-rocket" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" title="Rocket">🚀</button>
+          <button class="db-tool" data-tool="sticker-star" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.star">⭐</button>
+          <button class="db-tool" data-tool="sticker-thumb" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.thumb">👍</button>
+          <button class="db-tool" data-tool="sticker-heart" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.heart">❤️</button>
+          <button class="db-tool" data-tool="sticker-check" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.check">✅</button>
+          <button class="db-tool" data-tool="sticker-cross" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.cross">❌</button>
+          <button class="db-tool" data-tool="sticker-warn" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.warn">⚠️</button>
+          <button class="db-tool" data-tool="sticker-idea" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.idea">💡</button>
+          <button class="db-tool" data-tool="sticker-rocket" style="font-size: 20px; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;" data-i18n-title="sticker.rocket">🚀</button>
         </div>
       </div>
       <div class="db-sep"></div>
       <div class="db-group-wrap">
-        <button class="db-tool has-submenu" id="db-color-menu" title="Color Palette" style="color: #ef4444;">${ICONS.palette}</button>
+        <button class="db-tool has-submenu" id="db-color-menu" data-i18n-title="toolbar.colors" style="color: #ef4444;">${ICONS.palette}</button>
         <div class="db-sub-menu db-colors hidden" id="db-color-popup">
           <div class="db-color active" data-c="#ef4444" style="background:#ef4444;"></div>
           <div class="db-color" data-c="#3b82f6" style="background:#3b82f6;"></div>
@@ -425,20 +500,21 @@ function injectUI() {
         </div>
       </div>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-undo" title="Undo">${ICONS.undo}</button>
-      <button class="db-tool db-btn-redo" title="Redo">${ICONS.redo}</button>
+      <button class="db-tool db-btn-undo" data-i18n-title="toolbar.undo">${ICONS.undo}</button>
+      <button class="db-tool db-btn-redo" data-i18n-title="toolbar.redo">${ICONS.redo}</button>
       <div class="db-sep"></div>
-      <button class="db-tool" data-tool="eraser" title="Eraser">${ICONS.eraser}</button>
-      <button class="db-tool db-btn-clear" title="Clear all on this page">${ICONS.trash}</button>
+      <button class="db-tool" data-tool="eraser" data-i18n-title="toolbar.eraser">${ICONS.eraser}</button>
+      <button class="db-tool db-btn-clear" data-i18n-title="toolbar.clearAll">${ICONS.trash}</button>
       <div class="db-sep"></div>
-      <button class="db-tool db-btn-screenshot" title="Capture Screenshot">${ICONS.camera}</button>
-      <button class="db-tool db-btn-video" title="Record Video">${ICONS.video}</button>
-      <button class="db-tool db-btn-fullpage-ss" title="Full-Page Auto Screenshot">${ICONS.scrollPage}</button>
-      <button class="db-tool db-btn-scroll-ss" title="Scrollable Crop Screenshot">${ICONS.scrollCrop}</button>
-      <button class="db-tool db-btn-min" title="Minimize">${toolbarState.vert ? ICONS.up : ICONS.left}</button>
-      <button class="db-tool db-btn-close" title="Hide Toolbar">${ICONS.close}</button>
+      <button class="db-tool db-btn-screenshot" data-i18n-title="toolbar.screenshot">${ICONS.camera}</button>
+      <button class="db-tool db-btn-video" data-i18n-title="toolbar.video">${ICONS.video}</button>
+      <button class="db-tool db-btn-fullpage-ss" data-i18n-title="toolbar.fullPage">${ICONS.scrollPage}</button>
+      <button class="db-tool db-btn-scroll-ss" data-i18n-title="toolbar.scrollCrop">${ICONS.scrollCrop}</button>
+      <button class="db-tool db-btn-min" data-i18n-title="toolbar.minimize">${toolbarState.vert ? ICONS.up : ICONS.left}</button>
+      <button class="db-tool db-btn-close" data-i18n-title="toolbar.hide">${ICONS.close}</button>
     </div>
   `;
+  I18n.apply(drawBar);
   shadow.appendChild(drawBar);
 
   // Sidebar
@@ -451,30 +527,31 @@ function injectUI() {
     <div class="sb-header">
       <div class="sb-title">WebNotes <span class="ver-tag">v${v}</span></div>
       <div class="sb-actions">
-        <button class="icon-btn sb-refresh" title="Refresh">${ICONS.refresh}</button>
-        <button class="icon-btn sb-close" title="Close">${ICONS.close}</button>
+        <button class="icon-btn sb-refresh" data-i18n-title="sidebar.refresh">${ICONS.refresh}</button>
+        <button class="icon-btn sb-close" data-i18n-title="common.close">${ICONS.close}</button>
       </div>
     </div>
     <div class="sb-search-wrap">
-      <input class="sb-search" placeholder="Search…" type="text">
+      <input class="sb-search" data-i18n-placeholder="sidebar.search" type="text">
       <div class="sb-controls">
-        <select class="sb-sort-sel" title="Sort by">
-          <option value="date-desc">Newest first</option>
-          <option value="date-asc">Oldest first</option>
-          <option value="alpha">Alphabetical</option>
-          <option value="manual">Manual (Drag & Drop)</option>
+        <select class="sb-sort-sel" data-i18n-title="sidebar.sortBy">
+          <option value="date-desc" data-i18n="sidebar.sortNewest"></option>
+          <option value="date-asc" data-i18n="sidebar.sortOldest"></option>
+          <option value="alpha" data-i18n="sidebar.sortAlpha"></option>
+          <option value="manual" data-i18n="sidebar.sortManual"></option>
         </select>
-        <select class="sb-group-sel" title="Group by">
-          <option value="none">No Group</option>
-          <option value="tags">By Tags</option>
-          <option value="month">By Month</option>
+        <select class="sb-group-sel" data-i18n-title="sidebar.groupBy">
+          <option value="none" data-i18n="sidebar.groupNone"></option>
+          <option value="tags" data-i18n="sidebar.groupTags"></option>
+          <option value="month" data-i18n="sidebar.groupMonth"></option>
         </select>
       </div>
     </div>
     <div class="sb-notes"></div>
     <div class="sb-footer">
-      <button class="new-note-btn">+ New Note</button>
+      <button class="new-note-btn" data-i18n="sidebar.newNote"></button>
     </div>`;
+  I18n.apply(sb);
   shadow.appendChild(sb);
 
   // Set initial selected options
@@ -491,6 +568,74 @@ function injectUI() {
   setupDrawingBoard(svgOverlay, drawBar);
 }
 
+// ── Note Placement Jump ───────────────────────────────────────────────────────
+function jumpToNote(noteId) {
+  if (!shadow) return;
+  const note = notes.find(n => String(n.id) === String(noteId));
+  if (!note) return;
+
+  if (note.hidden) {
+    note.hidden = false;
+    saveNotes();
+    renderNote(note);
+    updateSidebarList();
+    updateBadge();
+  }
+
+  if (note.displayMode !== 'full') {
+    note.displayMode = 'full';
+    saveNotes();
+  }
+
+  let el = shadow.querySelector(`#note-${note.id}`);
+  if (!el) {
+    renderNote(note);
+    el = shadow.querySelector(`#note-${note.id}`);
+  }
+  if (el) {
+    applyStyle(el, note);
+    positionNote(el, note);
+
+    const targetY = note.pinned ? note.pageY : (note.y + window.scrollY);
+    const targetX = note.pinned ? note.pageX : (note.x + window.scrollX);
+
+    window.scrollTo({
+      top: Math.max(0, targetY - 100),
+      left: Math.max(0, targetX - 100),
+      behavior: 'smooth'
+    });
+
+    el.classList.remove('wn-jump-highlight');
+    void el.offsetWidth; // force reflow
+    el.classList.add('wn-jump-highlight');
+    setTimeout(() => {
+      if (el) el.classList.remove('wn-jump-highlight');
+    }, 2000);
+
+    const titleInp = el.querySelector('.t-inp');
+    if (titleInp) titleInp.focus();
+  }
+}
+
+function checkUrlJump() {
+  if (!masterOn) return;
+  const hash = location.hash;
+  const search = location.search;
+  let targetId = null;
+
+  if (hash && hash.includes('webnote-jump=')) {
+    const m = hash.match(/webnote-jump=([^&]+)/);
+    if (m) targetId = m[1];
+  } else if (search && search.includes('webnote_jump=')) {
+    const m = search.match(/webnote_jump=([^&]+)/);
+    if (m) targetId = m[1];
+  }
+
+  if (targetId) {
+    setTimeout(() => jumpToNote(targetId), 400);
+  }
+}
+
 // ── Note Creation ─────────────────────────────────────────────────────────────
 function createNote(opts = {}) {
   const vx = Math.max(20, Math.min(opts.x ?? 60, (window.innerWidth || 800) - 310));
@@ -498,7 +643,8 @@ function createNote(opts = {}) {
   const note = {
     id: Date.now().toString(),
     url: normUrl(location.href),
-    title: opts.title || 'New Note',
+    urlScope: opts.urlScope || 'exact',
+    title: opts.title || tr('note.newTitle'),
     content: opts.content || '',
     tags: opts.tags || [],
     x: vx, y: vy,
@@ -523,6 +669,8 @@ function renderNote(note) {
   el.id = `note-${note.id}`;
   el.style.pointerEvents = 'all';
   el.innerHTML = noteHTML(note);
+  I18n.apply(el);
+  updateNoteTexts(el, note);
   shadow.appendChild(el);
   applyStyle(el, note);
   positionNote(el, note);
@@ -531,46 +679,70 @@ function renderNote(note) {
 
 function noteHTML(note) {
   const nc = NOTE_COLORS.map((c, i) =>
-    `<div class="sw ns" data-c="${c.v ?? ''}" style="background:${c.bg};${i === 0 ? 'border:2px solid #d1d5db' : ''}" title="${c.label}"></div>`
+    `<div class="sw ns" data-c="${c.v ?? ''}" style="background:${c.bg};${i === 0 ? 'border:2px solid #d1d5db' : ''}" data-i18n-title="${c.labelKey}"></div>`
   ).join('');
   const chips = note.tags.map(t =>
     `<span class="tag-chip">${t}<button class="tag-rm" data-t="${t}">×</button></span>`
   ).join('');
 
+  // Tooltips that depend on the note's state (pin, scope, expanded) are set by updateNoteTexts().
   return `
   <div class="nh">
     <div class="nh-l">
       <span class="dh">${ICONS.drag}</span>
-      <button class="icon-btn p-btn ${note.pinned ? 'pinned' : ''}" title="${note.pinned ? 'Unpin' : 'Pin'}">${note.pinned ? ICONS.pinned : ICONS.pin}</button>
-      <input class="t-inp" value="${note.title.replace(/"/g, '&quot;')}" placeholder="Title…">
+      <button class="icon-btn p-btn ${note.pinned ? 'pinned' : ''}">${note.pinned ? ICONS.pinned : ICONS.pin}</button>
+      <input class="t-inp" value="${note.title.replace(/"/g, '&quot;')}" data-i18n-placeholder="note.titlePlaceholder">
     </div>
     <div class="nh-r">
       <div class="dp-wrap">
-        <button class="icon-btn c-btn" title="Background Color">${ICONS.palette}</button>
+        <button class="icon-btn c-btn" data-i18n-title="note.bgColor">${ICONS.palette}</button>
         <div class="dp nc-dp hidden">${nc}</div>
       </div>
-      <button class="icon-btn dup-btn" title="Duplicate">${ICONS.duplicate}</button>
-      <button class="icon-btn cp-btn" title="Compact">${ICONS.compact}</button>
-      <button class="icon-btn ex-btn" title="Expand">${ICONS.expand}</button>
-      <button class="icon-btn hide-btn" title="Hide">${ICONS.eyeOff}</button>
-      <button class="icon-btn dl-btn" title="Delete">${ICONS.trash}</button>
+      <div class="dp-wrap">
+        <button class="icon-btn scope-btn-toggle">${ICONS.monitor}</button>
+        <div class="dp scope-dp hidden">
+          <div class="scope-opt ${note.urlScope === 'exact' ? 'active' : ''}" data-s="exact" data-i18n="note.scopeExact"></div>
+          <div class="scope-opt ${note.urlScope === 'path' ? 'active' : ''}" data-s="path" data-i18n="note.scopePath"></div>
+          <div class="scope-opt ${note.urlScope === 'domain' ? 'active' : ''}" data-s="domain" data-i18n="note.scopeDomain"></div>
+        </div>
+      </div>
+      <button class="icon-btn dup-btn" data-i18n-title="note.duplicate">${ICONS.duplicate}</button>
+      <button class="icon-btn cp-btn" data-i18n-title="note.compact">${ICONS.compact}</button>
+      <button class="icon-btn ex-btn">${ICONS.expand}</button>
+      <button class="icon-btn hide-btn" data-i18n-title="note.hide">${ICONS.eyeOff}</button>
+      <button class="icon-btn dl-btn" data-i18n-title="common.delete">${ICONS.trash}</button>
     </div>
   </div>
   <div class="fmt-bar">
-    <button class="fb-btn b-btn" title="Bold"><b>B</b></button>
-    <button class="fb-btn i-btn" title="Italic"><i>I</i></button>
+    <button class="fb-btn b-btn" data-i18n-title="note.bold"><b>B</b></button>
+    <button class="fb-btn i-btn" data-i18n-title="note.italic"><i>I</i></button>
     <div class="fmt-sep"></div>
-    <button class="fb-btn tg-btn" title="Tags">${ICONS.tags}</button>
+    <button class="fb-btn tg-btn" data-i18n-title="note.tags">${ICONS.tags}</button>
   </div>
   <div class="nb-wrap">
     <div class="nb" contenteditable="true" spellcheck="true">${note.content}</div>
   </div>
   <div class="tags-row hidden">
     <div class="tags-chips">${chips}</div>
-    <input class="tag-inp" placeholder="#tag + Enter" type="text">
+    <input class="tag-inp" data-i18n-placeholder="note.tagPlaceholder" type="text">
   </div>
   <div class="rz"></div>
-  <div class="note-float-icon" data-title="${note.title || 'Untitled'}">${ICONS.note}</div>`;
+  <div class="note-float-icon" data-title="${escapeHtml(note.title || tr('note.untitled'))}">${ICONS.note}</div>`;
+}
+
+// Labels the tooltips of a note whose text depends on its state (pinned, URL scope, expanded).
+function updateNoteTexts(el, note) {
+  const pin = el.querySelector('.p-btn');
+  if (pin) pin.title = tr(note.pinned ? 'note.unpin' : 'note.pin');
+
+  const scopeBtn = el.querySelector('.scope-btn-toggle');
+  if (scopeBtn) {
+    const scope = tr(note.urlScope === 'domain' ? 'note.scopeDomainShort' : (note.urlScope === 'path' ? 'note.scopePathShort' : 'note.scopeExactShort'));
+    scopeBtn.title = tr('note.scopeTitle', { scope });
+  }
+
+  const expand = el.querySelector('.ex-btn');
+  if (expand) expand.title = tr(note._expanded ? 'note.restoreSize' : 'note.expand');
 }
 
 function applyStyle(el, note) {
@@ -578,7 +750,7 @@ function applyStyle(el, note) {
   el.style.background = note.color || '';
   // Update float icon tooltip when title changes
   const floatIcon = el.querySelector('.note-float-icon');
-  if (floatIcon) floatIcon.setAttribute('data-title', note.title || 'Untitled');
+  if (floatIcon) floatIcon.setAttribute('data-title', note.title || tr('note.untitled'));
 }
 
 function positionNote(el, note) {
@@ -606,7 +778,7 @@ function bindEvents(el, note) {
     note.title = e.target.value;
     // Keep float icon tooltip in sync
     const fi = q('.note-float-icon');
-    if (fi) fi.setAttribute('data-title', note.title || 'Untitled');
+    if (fi) fi.setAttribute('data-title', note.title || tr('note.untitled'));
     saveNotes();
   };
 
@@ -683,6 +855,23 @@ function bindEvents(el, note) {
     saveNotes();
   });
 
+  // ── URL Scope ──
+  const scopeBtn = q('.scope-btn-toggle');
+  if (scopeBtn) {
+    scopeBtn.onclick = e => { e.stopPropagation(); closeDropdowns(); q('.scope-dp').classList.toggle('hidden'); };
+  }
+  qa('.scope-opt').forEach(opt => opt.onclick = e => {
+    e.stopPropagation();
+    note.urlScope = opt.dataset.s;
+    q('.scope-dp').classList.add('hidden');
+    updateNoteTexts(el, note);
+    qa('.scope-opt').forEach(o => o.classList.toggle('active', o.dataset.s === note.urlScope));
+    saveNotes();
+    updateBadge();
+    updateSidebarList();
+    renderPageNotes();
+  });
+
   // ── Tags ──
   q('.tg-btn').onclick = e => { e.stopPropagation(); q('.tags-row').classList.toggle('hidden'); };
   const tagInp = q('.tag-inp');
@@ -734,13 +923,12 @@ function bindEvents(el, note) {
     } else if (note._expanded) {
       note.width = note._baseW || 280; note.height = note._baseH || 220;
       note._expanded = false; note.displayMode = 'full';
-      q('.ex-btn').title = 'Expand';
     } else {
       note._baseW = note.width || 280; note._baseH = note.height || 220;
       note.width = Math.max(note._baseW, 480); note.height = Math.max(note._baseH, 380);
       note._expanded = true; note.displayMode = 'full';
-      q('.ex-btn').title = 'Restore original size';
     }
+    updateNoteTexts(el, note);
     applyStyle(el, note); positionNote(el, note); saveNotes();
   };
 
@@ -752,15 +940,14 @@ function bindEvents(el, note) {
       note.pageX = parseInt(el.style.left) + scrollX;
       note.pageY = parseInt(el.style.top) + scrollY;
       pb.innerHTML = ICONS.pinned;
-      pb.title = 'Unpin (fixed on page)';
       pb.classList.add('pinned');
     } else {
       note.x = parseInt(el.style.left);
       note.y = parseInt(el.style.top);
       pb.innerHTML = ICONS.pin;
-      pb.title = 'Pin to page';
       pb.classList.remove('pinned');
     }
+    updateNoteTexts(el, note);
     applyStyle(el, note);
     saveNotes();
   };
@@ -1031,7 +1218,7 @@ function makeHighlightEl(hl) {
   span.className = 'webnote-hl';
   span.style.backgroundColor = hl.color;
   span.dataset.wn = hl.id;
-  span.title = 'WebNote Highlight – Use Eraser tool to remove';
+  span.title = tr('highlight.tooltip');
   return span;
 }
 
@@ -1065,8 +1252,8 @@ function updateSidebarList(query = '') {
   const list = shadow.querySelector('.sb-notes');
   if (!list) return;
   const q = query.toLowerCase();
-  const cur = normUrl(location.href);
-  let visible = notes.filter(n => normUrl(n.url) === cur && (
+  const cur = location.href;
+  let visible = notes.filter(n => isUrlMatch(n, cur) && (
     !q ||
     n.title.toLowerCase().includes(q) ||
     n.content.replace(/<[^>]+>/g, '').toLowerCase().includes(q) ||
@@ -1074,7 +1261,7 @@ function updateSidebarList(query = '') {
   ));
 
   if (!visible.length) {
-    list.innerHTML = `<div class="empty-hint">${q ? 'No results found.' : 'No notes on this page.'}</div>`;
+    list.innerHTML = `<div class="empty-hint">${trh(q ? 'sidebar.noResults' : 'sidebar.noNotes')}</div>`;
     return;
   }
 
@@ -1092,12 +1279,13 @@ function updateSidebarList(query = '') {
   // 2. Group
   let groups = {};
   if (sidebarGroup === 'none') {
-    groups['All Notes'] = visible;
+    groups[tr('sidebar.groupAll')] = visible;
   } else if (sidebarGroup === 'tags') {
+    const noTagsKey = tr('sidebar.groupNoTags');
     visible.forEach(n => {
       if (!n.tags || n.tags.length === 0) {
-        if (!groups['No Tags']) groups['No Tags'] = [];
-        groups['No Tags'].push(n);
+        if (!groups[noTagsKey]) groups[noTagsKey] = [];
+        groups[noTagsKey].push(n);
       } else {
         n.tags.forEach(t => {
           const key = `#${t}`;
@@ -1107,7 +1295,7 @@ function updateSidebarList(query = '') {
       }
     });
   } else if (sidebarGroup === 'month') {
-    const formatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+    const formatter = new Intl.DateTimeFormat(I18n.locale, { month: 'long', year: 'numeric' });
     visible.forEach(n => {
       const d = new Date(parseInt(n.id));
       const key = formatter.format(d);
@@ -1157,20 +1345,21 @@ function updateSidebarList(query = '') {
       }
 
       const tags = note.tags.map(t => `<span class="sb-tag">#${t}</span>`).join(' ');
-      const preview = note.content.replace(/<[^>]+>/g, '').substring(0, 50) || '(empty)';
+      const preview = note.content.replace(/<[^>]+>/g, '').substring(0, 50) || tr('sidebar.empty');
       const cbg = note.color ? `background:${note.color}33;border-left:3px solid ${note.color};` : '';
       
       const actionHtml = note.hidden
-        ? `<div class="sb-item-action unhide" title="Unhide">${ICONS.eye}</div>`
-        : `<div class="sb-item-action edit" title="Edit">${ICONS.pen}</div>`;
+        ? `<div class="sb-item-action unhide" title="${trh('sidebar.unhide')}">${ICONS.eye}</div>`
+        : `<div class="sb-item-action edit" title="${trh('sidebar.edit')}">${ICONS.pen}</div>`;
       
-      const titleLabel = note.hidden ? `${note.title || 'Untitled'} <span class="hidden-badge">(Hidden)</span>` : (note.title || 'Untitled');
+      const titleLabel = note.hidden ? `${note.title || tr('note.untitled')} <span class="hidden-badge">${trh('sidebar.hiddenBadge')}</span>` : (note.title || tr('note.untitled'));
 
       item.className = 'sb-item' + (note.hidden ? ' hidden-note' : '');
       item.innerHTML = `
         <div class="sb-item-actions">
+          <div class="sb-item-action jump" title="${trh('sidebar.jump')}">${ICONS.target}</div>
           ${actionHtml}
-          <div class="sb-item-action del" title="Delete">${ICONS.trash}</div>
+          <div class="sb-item-action del" title="${trh('common.delete')}">${ICONS.trash}</div>
         </div>
         <div class="sb-item-title" style="${cbg}">${note.pinned ? ICONS.pinned : ICONS.pin} ${titleLabel}</div>
         ${tags ? `<div class="sb-item-tags">${tags}</div>` : ''}
@@ -1178,15 +1367,16 @@ function updateSidebarList(query = '') {
 
       item.onclick = (e) => {
         if (e.target.closest('.sb-item-action')) return;
-        if (note.hidden) return;
-        if (note.displayMode !== 'full') {
-          note.displayMode = 'full';
-          const el = shadow.querySelector(`#note-${note.id}`);
-          if (el) { applyStyle(el, note); positionNote(el, note); } saveNotes();
-        }
-        const el = shadow.querySelector(`#note-${note.id}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        jumpToNote(note.id);
       };
+
+      const jumpBtn = item.querySelector('.jump');
+      if (jumpBtn) {
+        jumpBtn.onclick = (e) => {
+          e.stopPropagation();
+          jumpToNote(note.id);
+        };
+      }
 
       if (note.hidden) {
         const unhideBtn = item.querySelector('.unhide');
@@ -1198,6 +1388,7 @@ function updateSidebarList(query = '') {
             renderNote(note);
             updateSidebarList(query);
             updateBadge();
+            jumpToNote(note.id);
           };
         }
       } else {
@@ -1205,22 +1396,7 @@ function updateSidebarList(query = '') {
         if (editBtn) {
           editBtn.onclick = (e) => {
             e.stopPropagation();
-            if (note.displayMode !== 'full') {
-              note.displayMode = 'full';
-              saveNotes();
-              const el = shadow.querySelector(`#note-${note.id}`);
-              if (el) { applyStyle(el, note); positionNote(el, note); }
-            }
-            const el = shadow.querySelector(`#note-${note.id}`);
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              const titleInp = el.querySelector('.t-inp');
-              if (titleInp) {
-                titleInp.focus();
-                const len = titleInp.value.length;
-                titleInp.setSelectionRange(len, len);
-              }
-            }
+            jumpToNote(note.id);
           };
         }
       }
@@ -1242,15 +1418,16 @@ function updateSidebarList(query = '') {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function renderPageNotes() {
-  const cur = normUrl(location.href);
-  notes.filter(n => normUrl(n.url) === cur && !n.hidden).forEach(renderNote);
+  const cur = location.href;
+  notes.filter(n => isUrlMatch(n, cur) && !n.hidden).forEach(renderNote);
 }
 
 function saveNotes() { chrome.storage.local.set({ notes, rules, sidebarSort, sidebarGroup }); }
 
 function updateBadge() {
-  const cur = normUrl(location.href);
-  const count = notes.filter(n => normUrl(n.url) === cur && !n.hidden).length;
+  if (!masterOn) return;
+  const cur = location.href;
+  const count = notes.filter(n => isUrlMatch(n, cur) && !n.hidden).length;
   try {
     chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => { });
   } catch (e) {
@@ -1608,6 +1785,7 @@ function setupDrawingBoard(svg, bar) {
 
   // ESC to reset to cursor & Delete to remove selected
   document.addEventListener('keydown', (e) => {
+    if (!masterOn) return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
     if (e.key === 'Escape' && activeTool !== 'cursor') {
@@ -1698,7 +1876,7 @@ function setupDrawingBoard(svg, bar) {
   };
 
   bar.querySelector('.db-btn-clear').onclick = () => {
-    if (confirm('Do you really want to delete all drawings and highlights on this page?')) {
+    if (confirm(tr('confirm.clearPage'))) {
       saveDrawingSnapshot();
       drawings = drawings.filter(d => normUrl(d.url) !== normUrl(location.href));
       const highlights = document.querySelectorAll('.webnote-hl');
@@ -2063,6 +2241,7 @@ function setupDrawingBoard(svg, bar) {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  if (!masterOn) { reply({ ok: false }); return; }
   if (msg.action === 'ADD_NOTE') {
     const t = lastTarget || document.body;
     const r = t.getBoundingClientRect();
@@ -2114,6 +2293,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 // ── SPA Watch ─────────────────────────────────────────────────────────────────
 let lastUrl = location.href;
 setInterval(() => {
+  if (!masterOn) return;
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     if (shadow) shadow.querySelectorAll('.webnote-sticky').forEach(n => n.remove());
@@ -2121,8 +2301,35 @@ setInterval(() => {
   }
 }, 1000);
 
+// ── Master switch ─────────────────────────────────────────────────────────────
+// `extensionEnabled` is flipped from the popup. While it is off nothing of WebNote is visible
+// on the page: no toolbar, notes, drawings or highlights. The saved data stays in storage and
+// comes back as soon as the switch is turned on again.
+function suspend() {
+  const host = document.querySelector('#webnote-shadow-host');
+  if (host) host.style.display = 'none';
+  document.querySelectorAll('.webnote-hl').forEach(s => s.replaceWith(...s.childNodes));
+  activeTool = 'cursor';
+}
+
+function resume() {
+  if (shadow) shadow.querySelectorAll('.webnote-sticky').forEach(n => n.remove());
+  init();
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
-init();
+chrome.storage.local.get('extensionEnabled', (stored) => {
+  masterOn = stored.extensionEnabled !== false;
+  if (masterOn) init();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.extensionEnabled) return;
+  const on = changes.extensionEnabled.newValue !== false;
+  if (on === masterOn) return;
+  masterOn = on;
+  if (on) resume(); else suspend();
+});
 
 // ── Screenshot Module ───────────────────────────────────────────────────────
 function startScreenshotMode() {
@@ -2148,16 +2355,16 @@ function startScreenshotMode() {
 
   overlay.innerHTML = `
     <div class="wn-ss-tools">
-      <button class="wn-ss-tool active" data-m="crop" title="Select Area">${ICONS.crop}</button>
-      <button class="wn-ss-tool" data-m="target" title="Select Element">${ICONS.target}</button>
-      <button class="wn-ss-tool" data-m="screen" title="Full Screen">${ICONS.monitor}</button>
+      <button class="wn-ss-tool active" data-m="crop" title="${trh('capture.selectArea')}">${ICONS.crop}</button>
+      <button class="wn-ss-tool" data-m="target" title="${trh('capture.selectElement')}">${ICONS.target}</button>
+      <button class="wn-ss-tool" data-m="screen" title="${trh('capture.fullScreen')}">${ICONS.monitor}</button>
       <div class="db-sep"></div>
-      <button class="wn-ss-tool wn-ss-dest active" data-d="clipboard" title="Copy to Clipboard">${ICONS.clipboard}</button>
-      <button class="wn-ss-tool wn-ss-dest" data-d="download" title="Save as File">${ICONS.download}</button>
+      <button class="wn-ss-tool wn-ss-dest active" data-d="clipboard" title="${trh('capture.copyClipboard')}">${ICONS.clipboard}</button>
+      <button class="wn-ss-tool wn-ss-dest" data-d="download" title="${trh('capture.saveFile')}">${ICONS.download}</button>
       <div class="db-sep"></div>
-      <button class="wn-ss-tool wn-ss-close" title="Cancel">${ICONS.close}</button>
+      <button class="wn-ss-tool wn-ss-close" title="${trh('common.cancel')}">${ICONS.close}</button>
     </div>
-    <div class="wn-ss-hint">Select an area with the mouse</div>
+    <div class="wn-ss-hint">${trh('capture.hintArea')}</div>
     <div class="wn-ss-area" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.1); pointer-events:none;"></div>
     <div class="wn-ss-target" style="display:none; position:absolute; border:2px solid #6366f1; background:rgba(99,102,241,0.2); pointer-events:none; z-index:2147483646;"></div>
   `;
@@ -2195,8 +2402,8 @@ function startScreenshotMode() {
   const setMode = (m) => {
     mode = m;
     tools.forEach(t => t.classList.toggle('active', t.dataset.m === m));
-    hint.textContent = m === 'crop' ? 'Select an area with the mouse' :
-      m === 'target' ? 'Click on an element' : 'Click for full screen';
+    hint.textContent = m === 'crop' ? tr('capture.hintArea') :
+      m === 'target' ? tr('capture.hintElement') : tr('capture.hintScreen');
     areaEl.style.display = 'none';
     targetEl.style.display = 'none';
   };
@@ -2323,7 +2530,7 @@ function startScreenshotMode() {
         const blob = dataURLToBlob(dataUrl);
         const item = new ClipboardItem({ [blob.type]: blob });
         await navigator.clipboard.write([item]);
-        showToast('In Zwischenablage kopiert!');
+        showToast(tr('toast.copied'));
       } catch (err) {
         console.error('[WebNote] Clipboard error:', err);
         // Fallback: download if copy fails
@@ -2367,29 +2574,29 @@ function startVideoRecorder() {
     <div class="wn-rec-pick-card">
       <div class="wn-rec-pick-title">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
-        Video-Aufnahme
+        ${trh('rec.title')}
       </div>
-      <p class="wn-rec-pick-sub">Chrome öffnet einen Dialog zur Auswahl des aufzunehmenden Inhalts (Tab, Fenster oder Bildschirm).</p>
+      <p class="wn-rec-pick-sub">${trh('rec.sub')}</p>
       <div class="wn-rec-audio-section">
-        <div class="wn-rec-audio-heading">Audio-Einstellungen</div>
+        <div class="wn-rec-audio-heading">${trh('rec.audioSettings')}</div>
         <label class="wn-rec-audio-label">
           <input type="checkbox" id="wn-rec-browser-audio-cb" checked>
           <span class="wn-rec-audio-icon">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="10" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
           </span>
-          Browser- / Tab-Audio
+          ${trh('rec.browserAudio')}
         </label>
         <label class="wn-rec-audio-label">
           <input type="checkbox" id="wn-rec-mic-audio-cb">
           <span class="wn-rec-audio-icon">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
           </span>
-          Mikrofon-Audio
+          ${trh('rec.micAudio')}
         </label>
       </div>
       <div class="wn-rec-pick-actions">
-        <button class="wn-rec-pick-btn wn-rec-pick-cancel">Abbrechen</button>
-        <button class="wn-rec-pick-btn wn-rec-pick-start">Aufnahme starten</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-cancel">${trh('common.cancel')}</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-start">${trh('rec.start')}</button>
       </div>
     </div>
   `;
@@ -2497,9 +2704,9 @@ function startVideoRecorder() {
     pill.innerHTML = `
       <span class="wn-rec-dot"></span>
       <span class="wn-rec-timer">0:00</span>
-      <button class="wn-rec-stop-btn" title="Aufnahme stoppen">
+      <button class="wn-rec-stop-btn" title="${trh('rec.stopTitle')}">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-        Stopp
+        ${trh('rec.stop')}
       </button>
     `;
     shadowRoot.appendChild(pill);
@@ -2540,7 +2747,7 @@ function startVideoRecorder() {
     const reader = new FileReader();
     reader.onloadend = () => {
       downloadDataUrl(reader.result, `webnote-rec-${Date.now()}.webm`);
-      showWnToast('Aufnahme gespeichert ✓');
+      showWnToast(tr('toast.recSaved'));
     };
     reader.readAsDataURL(blob);
   }
@@ -2562,29 +2769,29 @@ function startFullPageScreenshot() {
     <div class="wn-rec-pick-card">
       <div class="wn-rec-pick-title">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><path d="M12 8v8"/><path d="m9 11 3-3 3 3"/><path d="m9 16 3 3 3-3"/></svg>
-        Full-Page Screenshot
+        ${trh('fullpage.title')}
       </div>
-      <p class="wn-rec-pick-sub">Die gesamte Seite wird automatisch von oben nach unten aufgenommen und als ein Bild zusammengesetzt.</p>
+      <p class="wn-rec-pick-sub">${trh('fullpage.sub')}</p>
       <div class="wn-rec-audio-section">
-        <div class="wn-rec-audio-heading">Ziel</div>
+        <div class="wn-rec-audio-heading">${trh('capture.destination')}</div>
         <label class="wn-rec-audio-label wn-ss-dest-label wn-ss-dest-active" data-dest="download">
           <input type="radio" name="wn-ss-dest" value="download" checked>
           <span class="wn-rec-audio-icon">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </span>
-          Als Datei speichern
+          ${trh('capture.saveFile')}
         </label>
         <label class="wn-rec-audio-label wn-ss-dest-label" data-dest="clipboard">
           <input type="radio" name="wn-ss-dest" value="clipboard">
           <span class="wn-rec-audio-icon">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
           </span>
-          In Zwischenablage kopieren
+          ${trh('capture.copyClipboard')}
         </label>
       </div>
       <div class="wn-rec-pick-actions">
-        <button class="wn-rec-pick-btn wn-rec-pick-cancel">Abbrechen</button>
-        <button class="wn-rec-pick-btn wn-rec-pick-start">Screenshot starten</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-cancel">${trh('common.cancel')}</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-start">${trh('fullpage.start')}</button>
       </div>
     </div>
   `;
@@ -2636,7 +2843,7 @@ function startFullPageScreenshot() {
     progress.className = 'wn-scroll-progress';
     progress.innerHTML = `
       <div class="wn-scroll-progress-bar" id="wn-scroll-bar"></div>
-      <span class="wn-scroll-progress-label" id="wn-scroll-label">Full-Page Screenshot… 0%</span>
+      <span class="wn-scroll-progress-label" id="wn-scroll-label">${trh('fullpage.progress', { percent: 0 })}</span>
     `;
     shadowRoot.appendChild(progress);
 
@@ -2644,7 +2851,7 @@ function startFullPageScreenshot() {
       const bar = shadowRoot.querySelector('#wn-scroll-bar');
       const label = shadowRoot.querySelector('#wn-scroll-label');
       if (bar) bar.style.width = pct + '%';
-      if (label) label.textContent = `Full-Page Screenshot… ${Math.round(pct)}%`;
+      if (label) label.textContent = tr('fullpage.progress', { percent: Math.round(pct) });
     };
 
     (async () => {
@@ -2714,14 +2921,14 @@ function startFullPageScreenshot() {
             for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
             const blob = new Blob([arr], { type: contentType });
             await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-            showWnToast('Full-Page Screenshot in Zwischenablage kopiert ✓');
+            showWnToast(tr('toast.fullpageCopied'));
           } catch (clipErr) {
             console.error('[WebNote] Clipboard write failed:', clipErr);
             downloadDataUrl(res.dataUrl, `webnote-fullpage-${Date.now()}.png`);
           }
         } else {
           downloadDataUrl(res.dataUrl, `webnote-fullpage-${Date.now()}.png`);
-          showWnToast('Full-Page Screenshot gespeichert ✓');
+          showWnToast(tr('toast.fullpageSaved'));
         }
       });
     })();
@@ -2748,29 +2955,29 @@ function startScrollableScreenshot() {
     <div class="wn-rec-pick-card">
       <div class="wn-rec-pick-title">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/><path d="m9 12 3 3 3-3"/><path d="M12 9v6"/></svg>
-        Scrollable Screenshot
+        ${trh('scroll.title')}
       </div>
-      <p class="wn-rec-pick-sub">Zieh einen Bereich mit der Maus auf. Dieser wird dann Stück für Stück nach unten gescrollt und aufgenommen.</p>
+      <p class="wn-rec-pick-sub">${trh('scroll.sub')}</p>
       <div class="wn-rec-audio-section">
-        <div class="wn-rec-audio-heading">Ziel</div>
+        <div class="wn-rec-audio-heading">${trh('capture.destination')}</div>
         <label class="wn-rec-audio-label wn-ss-dest-label wn-ss-dest-active" data-dest="download">
           <input type="radio" name="wn-ss-dest" value="download" checked>
           <span class="wn-rec-audio-icon">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </span>
-          Als Datei speichern
+          ${trh('capture.saveFile')}
         </label>
         <label class="wn-rec-audio-label wn-ss-dest-label" data-dest="clipboard">
           <input type="radio" name="wn-ss-dest" value="clipboard">
           <span class="wn-rec-audio-icon">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
           </span>
-          In Zwischenablage kopieren
+          ${trh('capture.copyClipboard')}
         </label>
       </div>
       <div class="wn-rec-pick-actions">
-        <button class="wn-rec-pick-btn wn-rec-pick-cancel">Abbrechen</button>
-        <button class="wn-rec-pick-btn wn-rec-pick-start">Bereich auswählen</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-cancel">${trh('common.cancel')}</button>
+        <button class="wn-rec-pick-btn wn-rec-pick-start">${trh('capture.selectArea')}</button>
       </div>
     </div>
   `;
@@ -2812,7 +3019,7 @@ function startScrollableScreenshot() {
 
     overlay.innerHTML = `
       <div class="wn-ss-hint" style="background: rgba(15, 23, 42, 0.85); font-weight: 500; font-size: 15px; border-radius: 8px; padding: 12px 20px;">
-        Bereich mit der Maus aufziehen (ESC zum Abbrechen)
+        ${trh('scroll.hint')}
       </div>
       <div class="wn-ss-area" style="display:none; position:absolute; border:2px dashed #6366f1; background:rgba(99,102,241,0.08); pointer-events:none; box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.45);"></div>
     `;
@@ -2877,19 +3084,19 @@ function startScrollableScreenshot() {
       <div class="wn-scroll-progress-card">
         <h3 class="wn-scroll-progress-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/><path d="m9 12 3 3 3-3"/><path d="M12 9v6"/></svg>
-          Scrollable Screenshot
+          ${trh('scroll.title')}
         </h3>
         <div class="wn-scroll-preview-container">
-          <div id="wn-scroll-preview-empty" style="color: #94a3b8; font-size: 13px;">Warte auf erste Erfassung...</div>
-          <img id="wn-scroll-preview-img" class="wn-scroll-preview-img" style="display: none;" alt="Preview" />
+          <div id="wn-scroll-preview-empty" style="color: #94a3b8; font-size: 13px;">${trh('scroll.waiting')}</div>
+          <img id="wn-scroll-preview-img" class="wn-scroll-preview-img" style="display: none;" alt="${trh('scroll.preview')}" />
         </div>
-        <p class="wn-scroll-stats" id="wn-scroll-stats">0 Teile erfasst (0px Höhe)</p>
+        <p class="wn-scroll-stats" id="wn-scroll-stats">${trh('scroll.stats', { count: 0, height: 0 })}</p>
         <div class="wn-scroll-actions">
           <div class="wn-scroll-btn-row">
-            <button class="wn-scroll-btn wn-scroll-btn-next" id="wn-scroll-next-btn" disabled>Nächster Teil</button>
-            <button class="wn-scroll-btn wn-scroll-btn-save" id="wn-scroll-save-btn" disabled>Speichern</button>
+            <button class="wn-scroll-btn wn-scroll-btn-next" id="wn-scroll-next-btn" disabled>${trh('scroll.next')}</button>
+            <button class="wn-scroll-btn wn-scroll-btn-save" id="wn-scroll-save-btn" disabled>${trh('scroll.save')}</button>
           </div>
-          <button class="wn-scroll-btn wn-scroll-btn-cancel" id="wn-scroll-cancel-btn">Abbrechen</button>
+          <button class="wn-scroll-btn wn-scroll-btn-cancel" id="wn-scroll-cancel-btn">${trh('common.cancel')}</button>
         </div>
       </div>
     `;
@@ -2939,7 +3146,7 @@ function startScrollableScreenshot() {
 
     const updatePreviewAndStats = async () => {
       if (frames.length === 0) return;
-      statsEl.textContent = `${frames.length} Teil(e) erfasst (${accumulatedHeight}px Höhe)`;
+      statsEl.textContent = tr('scroll.stats', { count: frames.length, height: accumulatedHeight });
 
       return new Promise(resolve => {
         chrome.runtime.sendMessage({
@@ -2971,10 +3178,10 @@ function startScrollableScreenshot() {
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       if (window.scrollY >= maxScroll - 1) {
         nextBtn.disabled = true;
-        nextBtn.textContent = 'Ende erreicht';
+        nextBtn.textContent = tr('scroll.end');
       } else {
         nextBtn.disabled = false;
-        nextBtn.textContent = 'Nächster Teil';
+        nextBtn.textContent = tr('scroll.next');
       }
     };
 
@@ -2991,7 +3198,7 @@ function startScrollableScreenshot() {
         saveBtn.disabled = false;
         checkScrollState();
       } else {
-        showWnToast('Fehler bei der ersten Erfassung ❌');
+        showWnToast(tr('toast.scrollFirstFail'));
         cleanup();
       }
     };
@@ -3031,7 +3238,7 @@ function startScrollableScreenshot() {
         accumulatedHeight += cropH;
         await updatePreviewAndStats();
       } else {
-        showWnToast('Fehler beim Erfassen des nächsten Teils ❌');
+        showWnToast(tr('toast.scrollNextFail'));
       }
 
       saveBtn.disabled = false;
@@ -3056,14 +3263,14 @@ function startScrollableScreenshot() {
           for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
           const blob = new Blob([arr], { type: contentType });
           navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-          showWnToast('Scroll-Screenshot in Zwischenablage kopiert ✓');
+          showWnToast(tr('toast.scrollCopied'));
         } catch (clipErr) {
           console.error('[WebNote] Clipboard failed:', clipErr);
           downloadDataUrl(finalDataUrl, `webnote-scroll-${Date.now()}.png`);
         }
       } else {
         downloadDataUrl(finalDataUrl, `webnote-scroll-${Date.now()}.png`);
-        showWnToast('Scroll-Screenshot gespeichert ✓');
+        showWnToast(tr('toast.scrollSaved'));
       }
     };
 

@@ -1,33 +1,34 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" class="i18n-loading">
 <head>
-  <title>WebNote Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebNote</title>
   <link rel="stylesheet" href="dashboard.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
     <aside class="sidebar">
       <div class="logo">
-        <img src="icons/icon48.png">
+        <img src="icons/icon48.png" alt="" width="28" height="28">
         <h1>WebNote</h1>
       </div>
-      <nav>
-        <button class="nav-btn active" data-tab="all-notes">All Notes</button>
-        <button class="nav-btn" data-tab="url-rules">URL Rules</button>
-        <button class="nav-btn" data-tab="settings">Settings</button>
+      <nav data-i18n-aria-label="dashboard.sections" aria-label="Sections">
+        <button class="nav-btn active" data-tab="all-notes" data-i18n="dashboard.navAllNotes">All Notes</button>
+        <button class="nav-btn" data-tab="url-rules" data-i18n="dashboard.navUrlRules">URL Rules</button>
+        <button class="nav-btn" data-tab="settings" data-i18n="dashboard.navSettings">Settings</button>
       </nav>
     </aside>
 
     <main class="content">
       <section id="all-notes" class="tab-content active">
         <div class="header-row">
-          <h2>Your Notes</h2>
+          <h2 data-i18n="dashboard.notes">Notes</h2>
           <div class="actions">
-            <input type="text" id="search-notes" placeholder="Search notes...">
-            <button id="export-btn" class="btn btn-secondary">Export JSON</button>
-            <button id="import-trigger" class="btn btn-secondary">Import JSON</button>
-            <input type="file" id="import-file" style="display:none">
+            <input type="search" id="search-notes" placeholder="Search notes" aria-label="Search notes" data-i18n-placeholder="dashboard.searchNotes" data-i18n-aria-label="dashboard.searchNotes">
+            <button id="export-btn" class="btn btn-secondary" data-i18n="dashboard.exportJson">Export JSON</button>
+            <button id="import-trigger" class="btn btn-secondary" data-i18n="dashboard.importJson">Import JSON</button>
+            <input type="file" id="import-file" accept=".json" hidden>
           </div>
         </div>
         <div id="notes-grid" class="notes-grid">
@@ -36,11 +37,11 @@
       </section>
 
       <section id="url-rules" class="tab-content">
-        <h2>URL Rules</h2>
-        <p>Control where WebNote appears. You can exclude specific domains or subpages.</p>
+        <h2 data-i18n="dashboard.rulesTitle">URL Rules</h2>
+        <p data-i18n="dashboard.rulesIntro">Control where WebNote appears. You can exclude specific domains or subpages.</p>
         <div class="rule-input">
-          <input type="text" id="new-rule" placeholder="e.g. google.com or /search">
-          <button id="add-rule" class="btn btn-primary">Add Exclusion</button>
+          <input type="text" id="new-rule" placeholder="e.g. google.com or /search" aria-label="Domain or path to exclude" data-i18n-placeholder="dashboard.rulePlaceholder" data-i18n-aria-label="dashboard.ruleAria" spellcheck="false">
+          <button id="add-rule" class="btn btn-primary" data-i18n="dashboard.addExclusion">Add exclusion</button>
         </div>
         <ul id="rules-list" class="rules-list">
           <!-- Rules here -->
@@ -48,20 +49,21 @@
       </section>
 
       <section id="settings" class="tab-content">
-        <h2>Settings</h2>
+        <h2 data-i18n="dashboard.settingsTitle">Settings</h2>
         <div class="setting-item">
           <div class="setting-info">
-            <h3>Cloud Sync</h3>
-            <p>Synchronize notes across your Chrome devices (limited to 100KB total).</p>
+            <h3 data-i18n="dashboard.cloudSync">Cloud Sync</h3>
+            <p data-i18n="dashboard.cloudSyncDesc">Sync notes across your browser profiles. Limited to 100 KB in total.</p>
           </div>
           <label class="switch">
-            <input type="checkbox" id="sync-toggle">
+            <input type="checkbox" id="sync-toggle" role="switch" aria-label="Cloud sync" data-i18n-aria-label="dashboard.cloudSyncAria">
             <span class="slider"></span>
           </label>
         </div>
       </section>
     </main>
   </div>
+  <script src="i18n.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
