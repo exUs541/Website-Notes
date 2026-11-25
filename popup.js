@@ -119,4 +119,19 @@ document.getElementById('bubble-opacity-slider').oninput = async (e) => {
   }
 };
 
+// Master switch: while it is off WebNote adds nothing to any page.
+const masterEnabled = document.getElementById('master-enabled');
+function renderEnabled(on) {
+  masterEnabled.checked = on;
+  document.body.classList.toggle('ext-off', !on);
+  document.getElementById('off-note').hidden = on;
+  document.querySelector('.card').inert = !on;
+  ['add-note', 'toggle-toolbar'].forEach((id) => { document.getElementById(id).disabled = !on; });
+}
+chrome.storage.local.get('extensionEnabled', (stored) => renderEnabled(stored.extensionEnabled !== false));
+masterEnabled.onchange = () => chrome.storage.local.set({ extensionEnabled: masterEnabled.checked });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.extensionEnabled) renderEnabled(changes.extensionEnabled.newValue !== false);
+});
+
 updateStats();

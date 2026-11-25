@@ -77,6 +77,10 @@ let undoStack = [];
 let redoStack = [];
 let isEraserDragging = false;
 
+// Master switch (popup toggle, chrome.storage.local, on by default). While false WebNote adds
+// nothing to the page and ignores the keyboard, the context menu and the popup.
+let masterOn = true;
+
 function saveDrawingSnapshot() {
   const cur = normUrl(location.href);
   undoStack.push(JSON.stringify(drawings.filter(d => normUrl(d.url) === cur)));
@@ -583,6 +587,7 @@ function jumpToNote(noteId) {
 }
 
 function checkUrlJump() {
+  if (!masterOn) return;
   const hash = location.hash;
   const search = location.search;
   let targetId = null;
@@ -1375,6 +1380,7 @@ function renderPageNotes() {
 function saveNotes() { chrome.storage.local.set({ notes, rules, sidebarSort, sidebarGroup }); }
 
 function updateBadge() {
+  if (!masterOn) return;
   const cur = location.href;
   const count = notes.filter(n => isUrlMatch(n, cur) && !n.hidden).length;
   try {
@@ -1734,6 +1740,7 @@ function setupDrawingBoard(svg, bar) {
 
   // ESC to reset to cursor & Delete to remove selected
   document.addEventListener('keydown', (e) => {
+    if (!masterOn) return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
     if (e.key === 'Escape' && activeTool !== 'cursor') {
@@ -2189,6 +2196,7 @@ function setupDrawingBoard(svg, bar) {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  if (!masterOn) { reply({ ok: false }); return; }
   if (msg.action === 'ADD_NOTE') {
     const t = lastTarget || document.body;
     const r = t.getBoundingClientRect();
@@ -2240,6 +2248,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 // ── SPA Watch ─────────────────────────────────────────────────────────────────
 let lastUrl = location.href;
 setInterval(() => {
+  if (!masterOn) return;
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     if (shadow) shadow.querySelectorAll('.webnote-sticky').forEach(n => n.remove());
@@ -2247,8 +2256,35 @@ setInterval(() => {
   }
 }, 1000);
 
+// ── Master switch ─────────────────────────────────────────────────────────────
+// `extensionEnabled` is flipped from the popup. While it is off nothing of WebNote is visible
+// on the page: no toolbar, notes, drawings or highlights. The saved data stays in storage and
+// comes back as soon as the switch is turned on again.
+function suspend() {
+  const host = document.querySelector('#webnote-shadow-host');
+  if (host) host.style.display = 'none';
+  document.querySelectorAll('.webnote-hl').forEach(s => s.replaceWith(...s.childNodes));
+  activeTool = 'cursor';
+}
+
+function resume() {
+  if (shadow) shadow.querySelectorAll('.webnote-sticky').forEach(n => n.remove());
+  init();
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
-init();
+chrome.storage.local.get('extensionEnabled', (stored) => {
+  masterOn = stored.extensionEnabled !== false;
+  if (masterOn) init();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.extensionEnabled) return;
+  const on = changes.extensionEnabled.newValue !== false;
+  if (on === masterOn) return;
+  masterOn = on;
+  if (on) resume(); else suspend();
+});
 
 // ── Screenshot Module ───────────────────────────────────────────────────────
 function startScreenshotMode() {
