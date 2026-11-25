@@ -1,4 +1,7 @@
 // popup.js
+const I18n = window.WebNoteI18n;
+const t = I18n.t;
+
 async function updateStats() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const data = await chrome.storage.local.get(['notes', 'autoShowFAB', 'bubbleOpacity']);
@@ -32,7 +35,7 @@ document.getElementById('add-note').onclick = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
     if (isRestrictedTab(tab)) {
-      alert("WebNote kann auf Chrome-Systemseiten oder im Web Store aus Sicherheitsgründen nicht verwendet werden.");
+      alert(t('popup.restrictedPage'));
       return;
     }
     
@@ -40,13 +43,13 @@ document.getElementById('add-note').onclick = async () => {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ['content.js']
+        files: ['i18n.js', 'content.js']
       });
     } catch (_) { }
 
     chrome.tabs.sendMessage(tab.id, { action: "ADD_NOTE" }, (response) => {
       if (chrome.runtime.lastError) {
-        alert("Hinweis: Bitte laden Sie die Seite einmal neu, um WebNote zu aktivieren.");
+        alert(t('popup.reloadHint'));
       } else {
         window.close();
       }
@@ -61,20 +64,20 @@ document.getElementById('toggle-toolbar').onclick = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
     if (isRestrictedTab(tab)) {
-      alert("WebNote kann auf Chrome-Systemseiten oder im Web Store aus Sicherheitsgründen nicht verwendet werden.");
+      alert(t('popup.restrictedPage'));
       return;
     }
 
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ['content.js']
+        files: ['i18n.js', 'content.js']
       });
     } catch (_) { }
 
     chrome.tabs.sendMessage(tab.id, { action: "TOGGLE_TOOLBAR" }, () => {
       if (chrome.runtime.lastError) {
-        alert("Hinweis: Bitte laden Sie die Seite einmal neu, um WebNote zu aktivieren.");
+        alert(t('popup.reloadHint'));
       } else {
         window.close();
       }
@@ -134,4 +137,95 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.extensionEnabled) renderEnabled(changes.extensionEnabled.newValue !== false);
 });
 
-updateStats();
+// ── Language switcher ───────────────────────────────────────────────────────
+const langBtn = document.getElementById('lang-btn');
+const langMenu = document.getElementById('lang-menu');
+const langCode = document.getElementById('lang-code');
+const CHECK_ICON = '<svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+function buildLanguageMenu() {
+  langMenu.replaceChildren(...I18n.languages.map(({ code, name }) => {
+    const li = document.createElement('li');
+    li.setAttribute('role', 'none');
+
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'lang-item';
+    item.setAttribute('role', 'menuitemradio');
+    item.dataset.lang = code;
+    item.lang = code; // every language is named in its own language
+
+    const label = document.createElement('span');
+    label.textContent = name;
+    item.appendChild(label);
+    item.insertAdjacentHTML('beforeend', CHECK_ICON);
+
+    li.appendChild(item);
+    return li;
+  }));
+}
+
+function refreshLanguageMenu() {
+  langCode.textContent = I18n.language.toUpperCase();
+  langMenu.querySelectorAll('.lang-item').forEach(item => {
+    item.setAttribute('aria-checked', String(item.dataset.lang === I18n.language));
+  });
+}
+
+function setLanguageMenuOpen(open, { returnFocus = false } = {}) {
+  langMenu.hidden = !open;
+  langBtn.setAttribute('aria-expanded', String(open));
+  if (open) {
+    (langMenu.querySelector('.lang-item[aria-checked="true"]') || langMenu.querySelector('.lang-item'))?.focus();
+  } else if (returnFocus) {
+    langBtn.focus();
+  }
+}
+
+langBtn.addEventListener('click', () => setLanguageMenuOpen(langMenu.hidden));
+langBtn.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' && langMenu.hidden) { e.preventDefault(); setLanguageMenuOpen(true); }
+});
+
+langMenu.addEventListener('click', async (e) => {
+  const item = e.target.closest('.lang-item');
+  if (!item) return;
+  setLanguageMenuOpen(false, { returnFocus: true });
+  await I18n.setLanguage(item.dataset.lang);
+});
+
+langMenu.addEventListener('keydown', (e) => {
+  const items = [...langMenu.querySelectorAll('.lang-item')];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+  else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+  else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+  else if (e.key === 'Escape') { e.preventDefault(); setLanguageMenuOpen(false, { returnFocus: true }); }
+  else if (e.key === 'Tab') { setLanguageMenuOpen(false); }
+});
+
+// Click anywhere else closes the menu.
+document.addEventListener('click', (e) => {
+  if (!langMenu.hidden && !e.target.closest('.lang')) setLanguageMenuOpen(false);
+});
+
+I18n.onChange(() => {
+  I18n.apply(document);
+  refreshLanguageMenu();
+});
+
+// ── Start ───────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    await I18n.init();
+    I18n.apply(document);
+    buildLanguageMenu();
+    refreshLanguageMenu();
+    await updateStats();
+  } catch (err) {
+    console.warn('Popup start-up issue:', err);
+  } finally {
+    document.documentElement.classList.remove('i18n-loading');
+  }
+})();

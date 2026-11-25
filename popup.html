@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="i18n-loading">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,34 +10,42 @@
   <header class="header">
     <img src="icons/icon48.png" alt="" width="24" height="24">
     <h1>WebNote</h1>
-    <label class="switch header-switch" title="Turn WebNote on or off">
-      <input type="checkbox" id="master-enabled" role="switch" aria-label="Turn WebNote on or off" checked>
+
+    <div class="lang">
+      <button type="button" id="lang-btn" class="lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" data-i18n-title="popup.language" data-i18n-aria-label="popup.language">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+        <span id="lang-code" class="lang-code" aria-hidden="true">EN</span>
+      </button>
+      <ul id="lang-menu" class="lang-menu" role="menu" data-i18n-aria-label="popup.language" hidden></ul>
+    </div>
+    <label class="switch header-switch" title="Turn WebNote on or off" data-i18n-title="popup.masterToggle">
+      <input type="checkbox" id="master-enabled" role="switch" aria-label="Turn WebNote on or off" data-i18n-aria-label="popup.masterToggle" checked>
       <span class="slider"></span>
     </label>
   </header>
-  <p id="off-note" class="off-note" role="status" hidden>WebNote is off. Pages stay exactly as they are.</p>
+  <p id="off-note" class="off-note" role="status" data-i18n="popup.offNote" hidden>WebNote is off. Pages stay exactly as they are.</p>
 
-  <section class="card" aria-label="Overview and settings">
+  <section class="card" data-i18n-aria-label="popup.overview" aria-label="Overview and settings">
     <div class="stat-item">
-      <span>Notes on this page</span>
+      <span data-i18n="popup.pageNotes">Notes on this page</span>
       <span id="page-count" class="stat-val">0</span>
     </div>
     <div class="stat-item">
-      <span>All notes</span>
+      <span data-i18n="popup.allNotes">All notes</span>
       <span id="total-count" class="stat-val">0</span>
     </div>
 
     <div class="setting-item">
-      <span class="setting-label">Show icon on new sites</span>
+      <span class="setting-label" data-i18n="popup.showIcon">Show icon on new sites</span>
       <label class="switch">
-        <input type="checkbox" id="auto-show-fab" role="switch" aria-label="Show icon on new sites" checked>
+        <input type="checkbox" id="auto-show-fab" role="switch" data-i18n-aria-label="popup.showIcon" aria-label="Show icon on new sites" checked>
         <span class="slider"></span>
       </label>
     </div>
 
     <div class="setting-item stacked">
       <label class="setting-row" for="bubble-opacity-slider">
-        <span class="setting-label">Icon opacity</span>
+        <span class="setting-label" data-i18n="popup.iconOpacity">Icon opacity</span>
         <span id="bubble-opacity-val" class="stat-val">80%</span>
       </label>
       <input type="range" id="bubble-opacity-slider" min="10" max="100" value="80">
@@ -45,15 +53,16 @@
   </section>
 
   <div class="actions">
-    <button id="add-note" class="btn btn-primary">Add note to page</button>
-    <button id="toggle-toolbar" class="btn btn-secondary">Show or hide toolbar</button>
-    <button id="open-dashboard" class="btn btn-secondary">Open dashboard</button>
+    <button id="add-note" class="btn btn-primary" data-i18n="popup.addNote">Add note to page</button>
+    <button id="toggle-toolbar" class="btn btn-secondary" data-i18n="popup.toggleToolbar">Show or hide toolbar</button>
+    <button id="open-dashboard" class="btn btn-secondary" data-i18n="popup.openDashboard">Open dashboard</button>
   </div>
 
   <footer class="footer">
     <span id="version" class="version-text">v2.2.0</span>
-    <a href="#" id="feedback-link" class="feedback-link">Feedback</a>
+    <a href="#" id="feedback-link" class="feedback-link" data-i18n="popup.feedback">Feedback</a>
   </footer>
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

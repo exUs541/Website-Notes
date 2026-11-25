@@ -47,11 +47,45 @@ body {
 .header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .header img { border-radius: 5px; }
 .header h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
-.header-switch { margin-left: auto; }
+.header-switch { flex-shrink: 0; }
 .off-note { margin: -4px 0 12px; padding: 8px 10px; border-radius: var(--radius); background: var(--surface); color: var(--muted); }
 .off-note[hidden] { display: none; }
 body.ext-off .card { opacity: .45; }
 .btn:disabled { opacity: .45; cursor: default; }
+
+/* The page stays hidden until the saved language is applied, so it never flashes in the wrong one. */
+.i18n-loading body { visibility: hidden; }
+
+/* Language switcher */
+.lang { position: relative; margin-left: auto; }
+.lang-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid transparent; border-radius: var(--radius);
+  background: transparent; color: var(--muted);
+  font: inherit; font-size: 11px; font-weight: 650; letter-spacing: .04em;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.lang-btn:hover, .lang-btn[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.lang-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 10;
+  min-width: 150px; margin: 0; padding: 4px; list-style: none;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .16);
+}
+.lang-menu[hidden] { display: none; }
+.lang-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 7px 8px;
+  border: 0; border-radius: 6px;
+  background: transparent; color: var(--text);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.lang-item:hover, .lang-item:focus-visible { background: var(--hover); }
+.lang-item[aria-checked="true"] { font-weight: 650; }
+.lang-item .check { flex-shrink: 0; color: var(--accent); visibility: hidden; }
+.lang-item[aria-checked="true"] .check { visibility: visible; }
 
 .card { padding: 4px 12px; margin-bottom: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .stat-item { display: flex; justify-content: space-between; padding: 8px 0; color: var(--muted); }

@@ -1,14 +1,28 @@
 // background.js - WebNote v3
 'use strict';
 
+importScripts('i18n.js');
+const I18n = self.WebNoteI18n;
+
+// Context-menu titles follow the language chosen in the popup. Calls are chained so that a
+// language change during start-up cannot interleave two remove/create rounds.
+let menuQueue = Promise.resolve();
+
 function setupMenus() {
-  chrome.contextMenus.removeAll(() => {
+  menuQueue = menuQueue.then(buildMenus).catch((e) => console.warn('[WebNote] context menu setup failed', e));
+  return menuQueue;
+}
+
+async function buildMenus() {
+  await I18n.init();
+  await new Promise((resolve) => chrome.contextMenus.removeAll(() => {
     if (chrome.runtime.lastError) { /* ignore */ }
-    const ignoreErr = () => { if (chrome.runtime.lastError) {} };
-    chrome.contextMenus.create({ id: 'add-note',       title: 'WebNote: Create Note', contexts: ['all'] }, ignoreErr);
-    chrome.contextMenus.create({ id: 'add-note-sel',   title: 'WebNote: Note from Selection', contexts: ['selection'] }, ignoreErr);
-    chrome.contextMenus.create({ id: 'add-highlight',  title: 'WebNote: Highlight Text 🖊',  contexts: ['selection'] }, ignoreErr);
-  });
+    resolve();
+  }));
+  const ignoreErr = () => { if (chrome.runtime.lastError) {} };
+  chrome.contextMenus.create({ id: 'add-note',       title: I18n.t('ctx.createNote'),          contexts: ['all'] }, ignoreErr);
+  chrome.contextMenus.create({ id: 'add-note-sel',   title: I18n.t('ctx.noteFromSelection'),   contexts: ['selection'] }, ignoreErr);
+  chrome.contextMenus.create({ id: 'add-highlight',  title: I18n.t('ctx.highlight'),           contexts: ['selection'] }, ignoreErr);
 }
 
 // ── Master switch ─────────────────────────────────────────────────────────────
@@ -47,6 +61,9 @@ chrome.runtime.onInstalled.addListener(async () => applyEnabledState(await isEna
 chrome.runtime.onStartup.addListener(async () => applyEnabledState(await isEnabled()));
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.extensionEnabled) applyEnabledState(changes.extensionEnabled.newValue !== false);
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.language) isEnabled().then((on) => { if (on) setupMenus(); });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {

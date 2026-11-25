@@ -1,3 +1,6 @@
+const I18n = window.WebNoteI18n;
+const t = I18n.t;
+
 let notes = [];
 let rules = { hiddenUrls: [] };
 
@@ -73,25 +76,25 @@ function renderNotes() {
   filtered.forEach(note => {
     const card = document.createElement('div');
     card.className = 'note-card';
-    const hiddenBadge = note.hidden ? ' <span class="hidden-badge">Hidden</span>' : '';
+    const hiddenBadge = note.hidden ? ` <span class="hidden-badge">${escapeHtml(t('dashboard.hidden'))}</span>` : '';
     const scope = note.urlScope || 'exact';
     const baseUrl = safeUrl(note.url);
     const targetJumpUrl = baseUrl === '#' ? '#' : `${baseUrl}#webnote-jump=${encodeURIComponent(note.id)}`;
 
     card.innerHTML = `
       <div class="meta">
-        <a href="${escapeHtml(targetJumpUrl)}" target="_blank" rel="noopener noreferrer" title="Open the page and jump to this note">${escapeHtml(note.url)}</a>
+        <a href="${escapeHtml(targetJumpUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(t('dashboard.openAndJump'))}">${escapeHtml(note.url)}</a>
         ${hiddenBadge}
       </div>
-      <div class="body" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Note text" title="Click to edit">${sanitizeHtml(note.content)}</div>
+      <div class="body" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="${escapeHtml(t('dashboard.noteText'))}" title="${escapeHtml(t('dashboard.clickToEdit'))}">${sanitizeHtml(note.content)}</div>
       <div class="footer">
-        <select class="dash-scope-select" aria-label="Where this note appears" title="Where this note appears">
-          <option value="exact" ${scope === 'exact' ? 'selected' : ''}>This page</option>
-          <option value="path" ${scope === 'path' ? 'selected' : ''}>Same path</option>
-          <option value="domain" ${scope === 'domain' ? 'selected' : ''}>Whole site</option>
+        <select class="dash-scope-select" aria-label="${escapeHtml(t('dashboard.scopeLabel'))}" title="${escapeHtml(t('dashboard.scopeLabel'))}">
+          <option value="exact" ${scope === 'exact' ? 'selected' : ''}>${escapeHtml(t('dashboard.scopeExact'))}</option>
+          <option value="path" ${scope === 'path' ? 'selected' : ''}>${escapeHtml(t('dashboard.scopePath'))}</option>
+          <option value="domain" ${scope === 'domain' ? 'selected' : ''}>${escapeHtml(t('dashboard.scopeDomain'))}</option>
         </select>
-        <a href="${escapeHtml(targetJumpUrl)}" target="_blank" rel="noopener noreferrer" class="jump-btn" title="Open the page and scroll to this note">Jump to note</a>
-        <button class="delete-btn">Delete</button>
+        <a href="${escapeHtml(targetJumpUrl)}" target="_blank" rel="noopener noreferrer" class="jump-btn" title="${escapeHtml(t('dashboard.jumpTitle'))}">${escapeHtml(t('dashboard.jumpToNote'))}</a>
+        <button class="delete-btn">${escapeHtml(t('common.delete'))}</button>
       </div>
     `;
     card.querySelector('.delete-btn').onclick = () => deleteNote(note.id);
@@ -141,8 +144,8 @@ function renderRules() {
 
     const remove = document.createElement('button');
     remove.className = 'delete-btn';
-    remove.textContent = 'Remove';
-    remove.setAttribute('aria-label', `Remove exclusion ${rule}`);
+    remove.textContent = t('dashboard.remove');
+    remove.setAttribute('aria-label', t('dashboard.removeExclusion', { rule }));
     remove.addEventListener('click', () => deleteRule(index));
 
     item.append(label, remove);
@@ -198,9 +201,9 @@ document.getElementById('import-file').onchange = (e) => {
       if (data.rules) rules = data.rules;
       await chrome.storage.local.set({ notes, rules });
       renderAll();
-      alert('Import successful.');
+      alert(t('dashboard.importOk'));
     } catch (err) {
-      alert('This file is not a valid WebNote export. Nothing was changed.');
+      alert(t('dashboard.importFail'));
     } finally {
       e.target.value = '';
     }
@@ -208,4 +211,18 @@ document.getElementById('import-file').onchange = (e) => {
   reader.readAsText(file);
 };
 
-loadData();
+// A language picked in the popup is applied here straight away, even while this page is open.
+I18n.onChange(() => {
+  I18n.apply(document);
+  renderAll();
+});
+
+(async () => {
+  try {
+    await I18n.init();
+    I18n.apply(document);
+    await loadData();
+  } finally {
+    document.documentElement.classList.remove('i18n-loading');
+  }
+})();
