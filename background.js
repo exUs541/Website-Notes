@@ -1,18 +1,70 @@
 // background.js - WebNote v3
 'use strict';
 
+importScripts('i18n.js');
+const I18n = self.WebNoteI18n;
+
+// Context-menu titles follow the language chosen in the popup. Calls are chained so that a
+// language change during start-up cannot interleave two remove/create rounds.
+let menuQueue = Promise.resolve();
+
 function setupMenus() {
-  chrome.contextMenus.removeAll(() => {
-    if (chrome.runtime.lastError) { /* ignore */ }
-    const ignoreErr = () => { if (chrome.runtime.lastError) {} };
-    chrome.contextMenus.create({ id: 'add-note',       title: 'WebNote: Create Note', contexts: ['all'] }, ignoreErr);
-    chrome.contextMenus.create({ id: 'add-note-sel',   title: 'WebNote: Note from Selection', contexts: ['selection'] }, ignoreErr);
-    chrome.contextMenus.create({ id: 'add-highlight',  title: 'WebNote: Highlight Text 🖊',  contexts: ['selection'] }, ignoreErr);
-  });
+  menuQueue = menuQueue.then(buildMenus).catch((e) => console.warn('[WebNote] context menu setup failed', e));
+  return menuQueue;
 }
 
-chrome.runtime.onInstalled.addListener(setupMenus);
-chrome.runtime.onStartup.addListener(setupMenus);
+async function buildMenus() {
+  await I18n.init();
+  await new Promise((resolve) => chrome.contextMenus.removeAll(() => {
+    if (chrome.runtime.lastError) { /* ignore */ }
+    resolve();
+  }));
+  const ignoreErr = () => { if (chrome.runtime.lastError) {} };
+  chrome.contextMenus.create({ id: 'add-note',       title: I18n.t('ctx.createNote'),          contexts: ['all'] }, ignoreErr);
+  chrome.contextMenus.create({ id: 'add-note-sel',   title: I18n.t('ctx.noteFromSelection'),   contexts: ['selection'] }, ignoreErr);
+  chrome.contextMenus.create({ id: 'add-highlight',  title: I18n.t('ctx.highlight'),           contexts: ['selection'] }, ignoreErr);
+}
+
+// ── Master switch ─────────────────────────────────────────────────────────────
+// `extensionEnabled` (popup toggle, chrome.storage.local, on by default). While it is off the
+// right-click entries are removed and the toolbar badge shows OFF instead of a note count.
+async function applyEnabledState(enabled) {
+  if (enabled) setupMenus(); else chrome.contextMenus.removeAll();
+  chrome.action.setBadgeText({ text: enabled ? '' : 'OFF' });
+  if (!enabled) chrome.action.setBadgeBackgroundColor({ color: '#6b7280' });
+  const tabs = await chrome.tabs.query({});
+  tabs.forEach(t => refreshTabBadge(t.id, t.url));
+}
+
+async function isEnabled() {
+  const { extensionEnabled } = await chrome.storage.local.get('extensionEnabled');
+  return extensionEnabled !== false;
+}
+
+// Badge of one tab: OFF while the extension is off, otherwise the number of its notes.
+async function refreshTabBadge(tabId, url) {
+  try {
+    const data = await chrome.storage.local.get(['notes', 'extensionEnabled']);
+    if (data.extensionEnabled === false) {
+      chrome.action.setBadgeText({ text: 'OFF', tabId });
+      chrome.action.setBadgeBackgroundColor({ color: '#6b7280', tabId });
+      return;
+    }
+    const notes = data.notes || [];
+    const count = notes.filter(n => n.url === url).length;
+    chrome.action.setBadgeText({ text: count > 0 ? String(count) : '', tabId });
+    chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
+  } catch (_) {}
+}
+
+chrome.runtime.onInstalled.addListener(async () => applyEnabledState(await isEnabled()));
+chrome.runtime.onStartup.addListener(async () => applyEnabledState(await isEnabled()));
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.extensionEnabled) applyEnabledState(changes.extensionEnabled.newValue !== false);
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.language) isEnabled().then((on) => { if (on) setupMenus(); });
+});
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   const msgMap = {
@@ -66,8 +118,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const tabId = sender.tab?.id;
     if (!tabId) return;
     const text = msg.count > 0 ? String(msg.count) : '';
-    chrome.action.setBadgeText({ text, tabId });
-    chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
+    chrome.storage.local.get('extensionEnabled').then(({ extensionEnabled }) => {
+      if (extensionEnabled === false) return; // switched off: the badge keeps saying OFF
+      chrome.action.setBadgeText({ text, tabId });
+      chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
+    });
   }
 
   if (msg.action === 'DOWNLOAD_FILE') {
@@ -166,22 +221,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // Update badge when switching tabs
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   try {
-    const tab  = await chrome.tabs.get(tabId);
-    const data = await chrome.storage.local.get('notes');
-    const notes = data.notes || [];
-    const count = notes.filter(n => n.url === tab.url).length;
-    chrome.action.setBadgeText({ text: count > 0 ? String(count) : '', tabId });
-    chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
+    const tab = await chrome.tabs.get(tabId);
+    refreshTabBadge(tabId, tab.url);
   } catch(_) {}
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (info.status !== 'complete') return;
-  try {
-    const data  = await chrome.storage.local.get('notes');
-    const notes = data.notes || [];
-    const count = notes.filter(n => n.url === tab.url).length;
-    chrome.action.setBadgeText({ text: count > 0 ? String(count) : '', tabId });
-    chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
-  } catch(_) {}
+  refreshTabBadge(tabId, tab.url);
 });

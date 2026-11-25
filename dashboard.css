@@ -150,3 +150,6 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .logo h1 { display: none; }
   .content { padding: 20px; }
 }
+
+/* The page stays hidden until the saved language is applied, so it never flashes in the wrong one. */
+.i18n-loading body { visibility: hidden; }
