@@ -125,6 +125,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
   }
 
+  // The content script styles its shadow root with this text, see loadStyles() in content.js.
+  if (msg.action === 'GET_CONTENT_CSS') {
+    fetch(chrome.runtime.getURL('content.css'))
+      .then((r) => r.text())
+      .then((css) => sendResponse({ css }), (e) => sendResponse({ error: String(e) }));
+    return true; // async
+  }
+
   if (msg.action === 'DOWNLOAD_FILE') {
     chrome.downloads.download({
       url: msg.url,

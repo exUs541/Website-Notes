@@ -287,6 +287,19 @@ function updatePinnedPositions() {
 }
 
 // ── UI Shell ──────────────────────────────────────────────────────────────────
+// content.css arrives as text from the background worker. Requesting the file from the page itself (<link> or
+// fetch) makes Chromium report "Unsafe attempt to load URL …/content.css" on sites with their own service
+// worker, e.g. YouTube.
+async function loadStyles(style) {
+  try {
+    const res = await chrome.runtime.sendMessage({ action: 'GET_CONTENT_CSS' });
+    if (!res?.css) throw new Error(res?.error || 'empty response');
+    style.textContent = res.css;
+  } catch (e) {
+    console.error('[WebNote] content.css could not be loaded', e);
+  }
+}
+
 function injectUI() {
   const parent = document.body || document.documentElement;
   if (!parent) {
@@ -320,10 +333,12 @@ function injectUI() {
 
   if (!shadow || shadow.querySelector('#webnote-drawbar')) return;
 
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = chrome.runtime.getURL('content.css');
-  shadow.appendChild(link);
+  // Filled with content.css by loadStyles(); the UI stays invisible until then. It comes first so that
+  // baseStyle keeps overriding it.
+  const mainStyle = document.createElement('style');
+  mainStyle.textContent = ':host { visibility: hidden; }';
+  shadow.appendChild(mainStyle);
+  loadStyles(mainStyle);
 
   const baseStyle = document.createElement('style');
   baseStyle.textContent = `
