@@ -120,7 +120,9 @@
     },
     tabs: {
       query: async () => [{ id: 1, url: pageUrl() }],
-      sendMessage: () => Promise.resolve({}),
+      // the popup asks the page how many notes it shows
+      sendMessage: (id, msg) => Promise.resolve(msg && msg.action === 'GET_PAGE_COUNT'
+        ? { ok: true, count: (ensure().notes || []).filter((n) => n.url === pageUrl()).length } : {}),
     },
     scripting: { executeScript: async () => {} },
   };

@@ -8,7 +8,9 @@ async function updateStats() {
   const notes = data.notes || [];
   
   const totalCount = notes.length;
-  const pageCount = notes.filter(n => n.url === tab.url).length;
+  // The page itself knows which notes belong to it; a page WebNote is not running on gives no answer.
+  const page = await chrome.tabs.sendMessage(tab.id, { action: 'GET_PAGE_COUNT' }).catch(() => null);
+  const pageCount = page?.ok ? page.count : '–';
   
   document.getElementById('total-count').textContent = totalCount;
   document.getElementById('page-count').textContent = pageCount;
