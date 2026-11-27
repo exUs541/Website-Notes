@@ -172,9 +172,9 @@
 
 /* ── Note Header ───────────────────────────────────────────────────────────── */
 .nh {
-  height: 42px;
   min-height: 42px;
   flex-shrink: 0;
+  flex-wrap: wrap; /* narrow notes: the buttons move below the title */
   background: rgba(0, 0, 0, 0.03);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
@@ -188,7 +188,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  flex: 1;
+  flex: 1 1 170px;
   min-width: 0;
 }
 
@@ -197,6 +197,7 @@
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .dh {

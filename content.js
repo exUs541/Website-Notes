@@ -88,7 +88,8 @@ let isEraserDragging = false;
 
 // Master switch (popup toggle, chrome.storage.local, on by default). While false WebNote adds
 // nothing to the page and ignores the keyboard, the context menu and the popup.
-let masterOn = true;
+let switchOn = true;   // the on/off switch
+let pageActive = true; // switched on and this address is not excluded by a URL rule
 
 function saveDrawingSnapshot() {
   const cur = normUrl(location.href);
@@ -160,6 +161,25 @@ function isUrlMatch(note, currentUrlStr) {
   } catch (_) {}
 
   return targetUrl === curUrl;
+}
+
+// URL rules (dashboard): WebNote stays off where one of them matches. A rule is a domain ("google.com",
+// subdomains included), a path ("/search", on any site) or both ("google.com/search").
+function isExcludedUrl(url, list) {
+  let u;
+  try { u = new URL(url); } catch (_) { return false; }
+  const host = u.hostname.toLowerCase().replace(/^www\./, '');
+  const path = u.pathname.toLowerCase();
+  return (list || []).some(raw => {
+    const rule = String(raw).trim().toLowerCase()
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/^\*\./, '').replace(/^www\./, '').split(/[?#]/)[0];
+    const slash = rule.indexOf('/');
+    const ruleHost = (slash < 0 ? rule : rule.slice(0, slash)).replace(/:\d+$/, '');
+    const rulePath = slash < 0 ? '' : rule.slice(slash).replace(/\/+$/, '');
+    if (!ruleHost && !rulePath) return false;
+    if (ruleHost && host !== ruleHost && !host.endsWith(`.${ruleHost}`)) return false;
+    return !rulePath || path === rulePath || path.startsWith(`${rulePath}/`);
+  });
 }
 
 // ── Note Migration (old schema → new schema) ──────────────────────────────────
@@ -633,7 +653,7 @@ function jumpToNote(noteId) {
 }
 
 function checkUrlJump() {
-  if (!masterOn) return;
+  if (!pageActive) return;
   const hash = location.hash;
   const search = location.search;
   let targetId = null;
@@ -697,7 +717,7 @@ function noteHTML(note) {
     `<div class="sw ns" data-c="${c.v ?? ''}" style="background:${c.bg};${i === 0 ? 'border:2px solid #d1d5db' : ''}" data-i18n-title="${c.labelKey}"></div>`
   ).join('');
   const chips = note.tags.map(t =>
-    `<span class="tag-chip">${t}<button class="tag-rm" data-t="${t}">×</button></span>`
+    `<span class="tag-chip">${escapeHtml(t)}<button class="tag-rm" data-t="${escapeHtml(t)}">×</button></span>`
   ).join('');
 
   // Tooltips that depend on the note's state (pin, scope, expanded) are set by updateNoteTexts().
@@ -706,7 +726,7 @@ function noteHTML(note) {
     <div class="nh-l">
       <span class="dh">${ICONS.drag}</span>
       <button class="icon-btn p-btn ${note.pinned ? 'pinned' : ''}">${note.pinned ? ICONS.pinned : ICONS.pin}</button>
-      <input class="t-inp" value="${note.title.replace(/"/g, '&quot;')}" data-i18n-placeholder="note.titlePlaceholder">
+      <input class="t-inp" value="${escapeHtml(note.title)}" data-i18n-placeholder="note.titlePlaceholder">
     </div>
     <div class="nh-r">
       <div class="dp-wrap">
@@ -1055,7 +1075,7 @@ function applyFormatRange(range, type, value) {
 function renderTags(el, note) {
   const chips = el.querySelector('.tags-chips');
   chips.innerHTML = note.tags.map(t =>
-    `<span class="tag-chip">${t}<button class="tag-rm" data-t="${t}">×</button></span>`
+    `<span class="tag-chip">${escapeHtml(t)}<button class="tag-rm" data-t="${escapeHtml(t)}">×</button></span>`
   ).join('');
   bindTagRemove(el, note);
 }
@@ -1245,11 +1265,12 @@ function removeHighlight(id) {
 
 function restoreHighlights() {
   setTimeout(() => {
+    if (!pageActive) return;
     highlights.filter(h => h.url === location.href).forEach(paintHighlight);
   }, 700);
 }
 
-function saveHighlights() { chrome.storage.local.set({ highlights }); }
+function saveHighlights() { store({ highlights }); }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function toggleSidebar() {
@@ -1359,15 +1380,17 @@ function updateSidebarList(query = '') {
         };
       }
 
-      const tags = note.tags.map(t => `<span class="sb-tag">#${t}</span>`).join(' ');
-      const preview = note.content.replace(/<[^>]+>/g, '').substring(0, 50) || tr('sidebar.empty');
+      const tags = note.tags.map(t => `<span class="sb-tag">#${escapeHtml(t)}</span>`).join(' ');
+      const plain = new DOMParser().parseFromString(String(note.content || ''), 'text/html').body.textContent;
+      const preview = escapeHtml(plain.substring(0, 50) || tr('sidebar.empty'));
       const cbg = note.color ? `background:${note.color}33;border-left:3px solid ${note.color};` : '';
       
       const actionHtml = note.hidden
         ? `<div class="sb-item-action unhide" title="${trh('sidebar.unhide')}">${ICONS.eye}</div>`
         : `<div class="sb-item-action edit" title="${trh('sidebar.edit')}">${ICONS.pen}</div>`;
       
-      const titleLabel = note.hidden ? `${note.title || tr('note.untitled')} <span class="hidden-badge">${trh('sidebar.hiddenBadge')}</span>` : (note.title || tr('note.untitled'));
+      const title = escapeHtml(note.title || tr('note.untitled'));
+      const titleLabel = note.hidden ? `${title} <span class="hidden-badge">${trh('sidebar.hiddenBadge')}</span>` : title;
 
       item.className = 'sb-item' + (note.hidden ? ' hidden-note' : '');
       item.innerHTML = `
@@ -1437,10 +1460,16 @@ function renderPageNotes() {
   notes.filter(n => isUrlMatch(n, cur) && !n.hidden).forEach(renderNote);
 }
 
-function saveNotes() { chrome.storage.local.set({ notes, rules, sidebarSort, sidebarGroup }); }
+// Every write of page data carries a stamp, so this tab can tell its own writes from those of others.
+const WRITER = Math.random().toString(36).slice(2);
+let writes = 0;
+function store(items) { chrome.storage.local.set({ ...items, lastWrite: { by: WRITER, n: ++writes } }); }
+
+// URL rules are only written by the dashboard.
+function saveNotes() { store({ notes, sidebarSort, sidebarGroup }); }
 
 function updateBadge() {
-  if (!masterOn) return;
+  if (!pageActive) return;
   const cur = location.href;
   const count = notes.filter(n => isUrlMatch(n, cur) && !n.hidden).length;
   try {
@@ -1463,7 +1492,7 @@ function selector(el) {
 }
 
 // ── Drawing Board ─────────────────────────────────────────────────────────────
-function saveDrawings() { chrome.storage.local.set({ drawings }); }
+function saveDrawings() { store({ drawings }); }
 
 function renderDrawings() {
   const svg = shadow.querySelector('#webnote-drawing-board');
@@ -1800,7 +1829,7 @@ function setupDrawingBoard(svg, bar) {
 
   // ESC to reset to cursor & Delete to remove selected
   document.addEventListener('keydown', (e) => {
-    if (!masterOn) return;
+    if (!pageActive) return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
     if (e.key === 'Escape' && activeTool !== 'cursor') {
@@ -2256,7 +2285,7 @@ function setupDrawingBoard(svg, bar) {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
-  if (!masterOn) { reply({ ok: false }); return; }
+  if (!pageActive) { reply({ ok: false, excluded: switchOn }); return; }
   if (msg.action === 'ADD_NOTE') {
     const t = lastTarget || document.body;
     const r = t.getBoundingClientRect();
@@ -2308,23 +2337,24 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 // ── SPA Watch ─────────────────────────────────────────────────────────────────
 let lastUrl = location.href;
 setInterval(() => {
-  if (!masterOn) return;
   if (location.href !== lastUrl) {
     lastUrl = location.href;
+    if (updateActive() || !pageActive) return; // a URL rule may switch WebNote on or off here
     if (shadow) shadow.querySelectorAll('.webnote-sticky').forEach(n => n.remove());
     renderPageNotes(); restoreHighlights(); renderDrawings(); updateBadge();
   }
 }, 1000);
 
-// ── Master switch ─────────────────────────────────────────────────────────────
-// `extensionEnabled` is flipped from the popup. While it is off nothing of WebNote is visible
-// on the page: no toolbar, notes, drawings or highlights. The saved data stays in storage and
-// comes back as soon as the switch is turned on again.
+// ── On / off ─────────────────────────────────────────────────────────────
+// WebNote is off while the switch (`extensionEnabled`) is off or a URL rule excludes the address.
+// Then nothing of it is visible on the page: no toolbar, notes, drawings or highlights. The saved
+// data stays in storage and comes back as soon as WebNote is on again.
 function suspend() {
   const host = document.querySelector('#webnote-shadow-host');
   if (host) host.style.display = 'none';
   document.querySelectorAll('.webnote-hl').forEach(s => s.replaceWith(...s.childNodes));
   activeTool = 'cursor';
+  try { chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count: 0 }).catch(() => { }); } catch (_) { }
 }
 
 function resume() {
@@ -2333,17 +2363,74 @@ function resume() {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-chrome.storage.local.get('extensionEnabled', (stored) => {
-  masterOn = stored.extensionEnabled !== false;
-  if (masterOn) init();
+function shouldBeActive() { return switchOn && !isExcludedUrl(location.href, rules.hiddenUrls); }
+
+// Starts or stops WebNote on this page if needed; true when something changed.
+function updateActive() {
+  const next = shouldBeActive();
+  if (next === pageActive) return false;
+  pageActive = next;
+  if (next) resume(); else suspend();
+  return true;
+}
+
+chrome.storage.local.get(['extensionEnabled', 'rules'], (stored) => {
+  switchOn = stored.extensionEnabled !== false;
+  rules = stored.rules || { hiddenUrls: [] };
+  pageActive = shouldBeActive();
+  if (pageActive) init();
 });
 
+// ── Sync between tabs ─────────────────────────────────────────────────────────
+// Notes, highlights and drawings can be changed by another tab or by the dashboard. The copies in
+// memory are brought up to date then; otherwise the next save here would write the old state back.
+const snapshot = (note) => JSON.stringify(Object.keys(note).sort().map(k => [k, note[k]]));
+
+function syncNotes(next) {
+  const known = new Map(notes.map(n => [n.id, n]));
+  const changed = new Set();
+  notes = next.map(raw => {
+    const fresh = migrateNote(raw);
+    const current = known.get(fresh.id);
+    if (!current) return fresh;
+    if (snapshot(current) !== snapshot(fresh)) {
+      changed.add(`note-${fresh.id}`);
+      Object.keys(current).forEach(k => delete current[k]);
+      Object.assign(current, fresh); // same object: event handlers keep pointing at it
+    }
+    return current;
+  });
+  if (!shadow || !pageActive) return;
+  const shown = new Set(notes.filter(n => isUrlMatch(n, location.href) && !n.hidden).map(n => `note-${n.id}`));
+  shadow.querySelectorAll('.webnote-sticky').forEach(el => { if (!shown.has(el.id) || changed.has(el.id)) el.remove(); });
+  renderPageNotes();
+  updateSidebarList(shadow.querySelector('.sb-search')?.value || '');
+  updateBadge();
+}
+
+function syncHighlights(next) {
+  highlights = next;
+  if (!shadow || !pageActive) return;
+  const ids = new Set(highlights.map(h => String(h.id)));
+  document.querySelectorAll('.webnote-hl').forEach(s => { if (!ids.has(s.dataset.wn)) s.replaceWith(...s.childNodes); });
+  highlights.filter(h => h.url === location.href && !document.querySelector(`[data-wn="${h.id}"]`)).forEach(paintHighlight);
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !changes.extensionEnabled) return;
-  const on = changes.extensionEnabled.newValue !== false;
-  if (on === masterOn) return;
-  masterOn = on;
-  if (on) resume(); else suspend();
+  if (area !== 'local' || changes.lastWrite?.newValue?.by === WRITER) return;
+  if (changes.rules) rules = changes.rules.newValue || { hiddenUrls: [] };
+  if (changes.extensionEnabled) switchOn = changes.extensionEnabled.newValue !== false;
+  if (changes.notes) syncNotes(changes.notes.newValue || []);
+  if (changes.highlights) syncHighlights(changes.highlights.newValue || []);
+  if (changes.drawings) {
+    drawings = changes.drawings.newValue || [];
+    if (shadow && pageActive) renderDrawings();
+  }
+  if (changes.bubbleOpacity) {
+    bubbleOpacity = changes.bubbleOpacity.newValue ?? 80;
+    document.querySelector('#webnote-shadow-host')?.style.setProperty('--webnote-bubble-opacity', bubbleOpacity / 100);
+  }
+  updateActive();
 });
 
 // ── Screenshot Module ───────────────────────────────────────────────────────
