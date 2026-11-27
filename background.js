@@ -33,7 +33,7 @@ async function applyEnabledState(enabled) {
   chrome.action.setBadgeText({ text: enabled ? '' : 'OFF' });
   if (!enabled) chrome.action.setBadgeBackgroundColor({ color: '#6b7280' });
   const tabs = await chrome.tabs.query({});
-  tabs.forEach(t => refreshTabBadge(t.id, t.url));
+  tabs.forEach(t => refreshTabBadge(t.id));
 }
 
 async function isEnabled() {
@@ -42,17 +42,18 @@ async function isEnabled() {
 }
 
 // Badge of one tab: OFF while the extension is off, otherwise the number of its notes.
-async function refreshTabBadge(tabId, url) {
+async function refreshTabBadge(tabId) {
   try {
-    const data = await chrome.storage.local.get(['notes', 'extensionEnabled']);
-    if (data.extensionEnabled === false) {
+    if (!(await isEnabled())) {
       chrome.action.setBadgeText({ text: 'OFF', tabId });
       chrome.action.setBadgeBackgroundColor({ color: '#6b7280', tabId });
       return;
     }
-    const notes = data.notes || [];
-    const count = notes.filter(n => n.url === url).length;
-    chrome.action.setBadgeText({ text: count > 0 ? String(count) : '', tabId });
+    // The page's content script knows which notes belong to it (scope, #anchors). Without an answer the
+    // badge is left alone: the script reports the number itself as soon as it runs.
+    const page = await chrome.tabs.sendMessage(tabId, { action: 'GET_PAGE_COUNT' }).catch(() => null);
+    if (!page?.ok) return;
+    chrome.action.setBadgeText({ text: page.count > 0 ? String(page.count) : '', tabId });
     chrome.action.setBadgeBackgroundColor({ color: '#6366f1', tabId });
   } catch (_) {}
 }
@@ -227,14 +228,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 // Update badge when switching tabs
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    refreshTabBadge(tabId, tab.url);
-  } catch(_) {}
-});
+chrome.tabs.onActivated.addListener(({ tabId }) => refreshTabBadge(tabId));
 
-chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
-  if (info.status !== 'complete') return;
-  refreshTabBadge(tabId, tab.url);
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (info.status === 'complete') refreshTabBadge(tabId);
 });

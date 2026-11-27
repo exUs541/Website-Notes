@@ -90,6 +90,7 @@ let isEraserDragging = false;
 // nothing to the page and ignores the keyboard, the context menu and the popup.
 let switchOn = true;   // the on/off switch
 let pageActive = true; // switched on and this address is not excluded by a URL rule
+let dataLoaded = false; // notes have been read from storage
 
 function saveDrawingSnapshot() {
   const cur = normUrl(location.href);
@@ -201,8 +202,8 @@ function migrateNote(note) {
   if (!note.pageX) note.pageX = (note.x || 80) + (window.scrollX || 0);
   if (!note.pageY) note.pageY = (note.y || 100) + (window.scrollY || 0);
 
-  // Normalize display mode (old: 'minimized' → just go 'full')
-  if (!['full', 'compact', 'icon'].includes(note.displayMode)) note.displayMode = 'full';
+  // Normalize display mode (the old modes 'minimized' and 'compact' → 'full')
+  if (!['full', 'icon'].includes(note.displayMode)) note.displayMode = 'full';
 
   return note;
 }
@@ -220,6 +221,7 @@ async function init() {
     drawings = data.drawings || [];
     toolbarState = data.toolbarState || { x: null, y: 20, min: false, vert: false, hidden: false };
     bubbleOpacity = data.bubbleOpacity !== undefined ? data.bubbleOpacity : 80;
+    dataLoaded = true;
     
     // Auto-show logic
     const autoShow = data.autoShowFAB !== false;
@@ -293,7 +295,7 @@ function applyLanguage() {
 
 function updatePinnedPositions() {
   if (!shadow) return;
-  notes.filter(n => n.url === location.href && n.pinned).forEach(note => {
+  notes.filter(n => n.pinned).forEach(note => { // only those shown here have an element
     const el = shadow.querySelector(`#note-${note.id}`);
     if (el) {
       el.style.left = `${note.pageX - scrollX}px`;
@@ -311,10 +313,19 @@ function updatePinnedPositions() {
 // fetch) makes Chromium report "Unsafe attempt to load URL …/content.css" on sites with their own service
 // worker, e.g. YouTube.
 async function loadStyles(style) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await chrome.runtime.sendMessage({ action: 'GET_CONTENT_CSS' });
+      if (res?.css) { style.textContent = res.css; return; }
+    } catch (_) { /* the worker was just stopping or starting */ }
+    await new Promise((resolve) => setTimeout(resolve, attempt * 300));
+  }
   try {
-    const res = await chrome.runtime.sendMessage({ action: 'GET_CONTENT_CSS' });
-    if (!res?.css) throw new Error(res?.error || 'empty response');
-    style.textContent = res.css;
+    // Better the console message than a toolbar that stays invisible: link the file after all.
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('content.css');
+    style.replaceWith(link);
   } catch (e) {
     console.error('[WebNote] content.css could not be loaded', e);
   }
@@ -953,9 +964,7 @@ function bindEvents(el, note) {
 
   // ── □ Expand / Restore toggle ──
   q('.ex-btn').onclick = () => {
-    if (note.displayMode === 'compact') {
-      note.displayMode = 'full';
-    } else if (note._expanded) {
+    if (note._expanded) {
       note.width = note._baseW || 280; note.height = note._baseH || 220;
       note._expanded = false; note.displayMode = 'full';
     } else {
@@ -1265,9 +1274,16 @@ function removeHighlight(id) {
 
 function restoreHighlights() {
   setTimeout(() => {
-    if (!pageActive) return;
-    highlights.filter(h => h.url === location.href).forEach(paintHighlight);
+    if (pageActive) paintPageHighlights();
   }, 700);
+}
+
+// Paints the highlights of this page that are not on screen yet. An #anchor in the address does not matter.
+function paintPageHighlights() {
+  const here = normUrl(location.href);
+  highlights
+    .filter(h => normUrl(h.url) === here && !document.querySelector(`[data-wn="${CSS.escape(String(h.id))}"]`))
+    .forEach(paintHighlight);
 }
 
 function saveHighlights() { store({ highlights }); }
@@ -1468,10 +1484,11 @@ function store(items) { chrome.storage.local.set({ ...items, lastWrite: { by: WR
 // URL rules are only written by the dashboard.
 function saveNotes() { store({ notes, sidebarSort, sidebarGroup }); }
 
+const pageNoteCount = () => notes.filter(n => isUrlMatch(n, location.href) && !n.hidden).length;
+
 function updateBadge() {
   if (!pageActive) return;
-  const cur = location.href;
-  const count = notes.filter(n => isUrlMatch(n, cur) && !n.hidden).length;
+  const count = pageNoteCount();
   try {
     chrome.runtime.sendMessage({ action: 'UPDATE_BADGE', count }).catch(() => { });
   } catch (e) {
@@ -2285,6 +2302,10 @@ function setupDrawingBoard(svg, bar) {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  if (msg.action === 'GET_PAGE_COUNT') { // asked by the popup and for the toolbar badge
+    reply(pageActive && dataLoaded ? { ok: true, count: pageNoteCount() } : { ok: false });
+    return;
+  }
   if (!pageActive) { reply({ ok: false, excluded: switchOn }); return; }
   if (msg.action === 'ADD_NOTE') {
     const t = lastTarget || document.body;
@@ -2413,7 +2434,7 @@ function syncHighlights(next) {
   if (!shadow || !pageActive) return;
   const ids = new Set(highlights.map(h => String(h.id)));
   document.querySelectorAll('.webnote-hl').forEach(s => { if (!ids.has(s.dataset.wn)) s.replaceWith(...s.childNodes); });
-  highlights.filter(h => h.url === location.href && !document.querySelector(`[data-wn="${h.id}"]`)).forEach(paintHighlight);
+  paintPageHighlights();
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
