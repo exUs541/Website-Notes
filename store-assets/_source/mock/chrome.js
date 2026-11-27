@@ -76,14 +76,20 @@
     store = clone(s);
     return store;
   };
+  const read = (keys) => {
+    const st = ensure();
+    if (keys == null) return clone(st);
+    if (typeof keys === 'string') keys = [keys];
+    const out = {};
+    if (Array.isArray(keys)) keys.forEach((k) => { if (k in st) out[k] = clone(st[k]); });
+    else Object.keys(keys).forEach((k) => { out[k] = k in st ? clone(st[k]) : keys[k]; });
+    return out;
+  };
   const local = {
-    async get(keys) {
-      const st = ensure();
-      if (keys == null) return clone(st);
-      if (typeof keys === 'string') keys = [keys];
-      const out = {};
-      if (Array.isArray(keys)) keys.forEach((k) => { if (k in st) out[k] = clone(st[k]); });
-      else Object.keys(keys).forEach((k) => { out[k] = k in st ? clone(st[k]) : keys[k]; });
+    // like the real API: answers a callback if one is given, and returns a promise
+    async get(keys, callback) {
+      const out = read(keys);
+      if (typeof callback === 'function') setTimeout(() => callback(out), 0);
       return out;
     },
     async set(items) {
@@ -99,9 +105,15 @@
   window.chrome = {
     storage: { local, onChanged: { addListener: (cb) => listeners.push(cb) } },
     runtime: {
-      getManifest: () => ({ version: '2.1.1' }),
+      getManifest: () => ({ version: '2.3.0' }),
       getURL: (p) => '/ext/' + p,
-      sendMessage: (msg, cb) => { window.__sent.push(msg); if (typeof cb === 'function') setTimeout(() => cb({}), 0); return Promise.resolve({}); },
+      sendMessage: (msg, cb) => {
+        window.__sent.push(msg);
+        // the content script gets its stylesheet from the background worker
+        const reply = msg.action === 'GET_CONTENT_CSS' ? fetch('/ext/content.css').then((r) => r.text()).then((css) => ({ css })) : Promise.resolve({});
+        if (typeof cb === 'function') reply.then((v) => setTimeout(() => cb(v), 0));
+        return reply;
+      },
       onMessage: { addListener() {} },
       openOptionsPage() {},
       lastError: undefined,

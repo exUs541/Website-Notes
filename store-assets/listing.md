@@ -85,7 +85,7 @@ Can I draw on a web page?
 Yes. Choose the pen, a shape or an arrow in the toolbar and draw directly on the page.
 
 Do my notes sync between devices?
-No. Notes are stored locally in your browser. To move them, export a JSON backup in the dashboard and import it on the other device.
+No. Notes are stored locally in your browser. To move them, export a backup in the dashboard settings and restore it on the other device.
 
 Does WebNote work on every page?
 It works on normal web pages. Browsers do not allow extensions on internal pages (such as chrome:// or edge:// pages) or on the extension stores.
@@ -121,7 +121,7 @@ Chrome has no keyword field: search uses the name, the short description and the
 | web notes, notebook, research | description opening and "Perfect for" |
 | private, local, no account | summary, description opening, privacy section |
 
-Only features that exist in the code are described. Deliberately **not** claimed: cloud sync (the toggle in the dashboard does nothing yet), sync between devices, PDF annotation, ratings or "best" claims.
+Only features that exist in the code are described. Deliberately **not** claimed: cloud sync (there is none), sync between devices, PDF annotation, ratings or "best" claims.
 
 ## Chrome Web Store only: Privacy practices
 
@@ -219,5 +219,5 @@ Permissions
 
 ## Maintainer notes
 
-- The "Cloud Sync" switch in the dashboard has no function yet, so it is not advertised anywhere. Add it to the texts and a screenshot once it works.
+- There is no cloud sync: the switch that did nothing was removed from the dashboard. Data moves between devices through backup and restore.
 - A new name or summary goes live only with a higher `version` in `manifest.json`. Rebuild the Edge package after the bump: `store-kit\Build-EdgePackages.ps1 -Only WebNote -Local`.

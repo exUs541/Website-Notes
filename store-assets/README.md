@@ -57,4 +57,4 @@ The screenshots are real captures: the real `content.js`, popup and dashboard ru
 
 ## Notes
 
-- The texts describe only features that exist in the code. The "Cloud Sync" switch in the dashboard has no function yet, so it is not advertised anywhere.
+- The texts describe only features that exist in the code. There is no cloud sync; data moves between devices through backup and restore.
