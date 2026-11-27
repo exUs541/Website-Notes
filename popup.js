@@ -50,6 +50,8 @@ document.getElementById('add-note').onclick = async () => {
     chrome.tabs.sendMessage(tab.id, { action: "ADD_NOTE" }, (response) => {
       if (chrome.runtime.lastError) {
         alert(t('popup.reloadHint'));
+      } else if (response?.excluded) {
+        alert(t('popup.excludedPage'));
       } else {
         window.close();
       }
@@ -75,9 +77,11 @@ document.getElementById('toggle-toolbar').onclick = async () => {
       });
     } catch (_) { }
 
-    chrome.tabs.sendMessage(tab.id, { action: "TOGGLE_TOOLBAR" }, () => {
+    chrome.tabs.sendMessage(tab.id, { action: "TOGGLE_TOOLBAR" }, (response) => {
       if (chrome.runtime.lastError) {
         alert(t('popup.reloadHint'));
+      } else if (response?.excluded) {
+        alert(t('popup.excludedPage'));
       } else {
         window.close();
       }
@@ -95,7 +99,7 @@ const feedbackEl = document.getElementById('feedback-link');
 if (feedbackEl) {
   feedbackEl.onclick = (e) => {
     e.preventDefault();
-    window.open('mailto:feedback@webnote.app?subject=WebNote%20Feedback', '_blank');
+    window.open('https://github.com/exUs541/Website-Notes/issues', '_blank');
   };
 }
 

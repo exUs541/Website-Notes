@@ -16,6 +16,11 @@ function renderAll() {
   renderRules();
 }
 
+// Writes carry a stamp: the dashboard skips its own changes, open web pages pick them up.
+const WRITER = Math.random().toString(36).slice(2);
+let writes = 0;
+function store(items) { return chrome.storage.local.set({ ...items, lastWrite: { by: WRITER, n: ++writes } }); }
+
 // ── Safe rendering helpers ───────────────────────────────────────────────
 // Note URLs, rules and note bodies can come from an imported file, so none of
 // them is placed into the page as trusted markup.
@@ -66,12 +71,20 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 });
 
 // Notes Render
+const plainText = (html) => new DOMParser().parseFromString(String(html ?? ''), 'text/html').body.textContent;
+const tagsOf = (note) => (Array.isArray(note.tags) ? note.tags.map(String) : []);
+
 function renderNotes() {
   const grid = document.getElementById('notes-grid');
   const query = document.getElementById('search-notes').value.toLowerCase();
   grid.innerHTML = '';
 
-  const filtered = notes.filter(n => String(n.content || '').toLowerCase().includes(query) || String(n.url || '').toLowerCase().includes(query));
+  const filtered = notes.filter(n => [n.title || '', plainText(n.content), n.url || '', ...tagsOf(n).map(tag => `#${tag}`)]
+    .join('\n').toLowerCase().includes(query));
+
+  const empty = document.getElementById('notes-empty');
+  empty.hidden = filtered.length > 0;
+  empty.textContent = t(notes.length ? 'dashboard.noMatches' : 'dashboard.emptyNotes');
 
   filtered.forEach(note => {
     const card = document.createElement('div');
@@ -81,12 +94,17 @@ function renderNotes() {
     const baseUrl = safeUrl(note.url);
     const targetJumpUrl = baseUrl === '#' ? '#' : `${baseUrl}#webnote-jump=${encodeURIComponent(note.id)}`;
 
+    const title = String(note.title || t('note.untitled'));
+    const tags = tagsOf(note).map(tag => `<span class="tag">#${escapeHtml(tag)}</span>`).join('');
+
     card.innerHTML = `
+      <h3 class="title" title="${escapeHtml(title)}">${escapeHtml(title)}</h3>
       <div class="meta">
         <a href="${escapeHtml(targetJumpUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(t('dashboard.openAndJump'))}">${escapeHtml(note.url)}</a>
         ${hiddenBadge}
       </div>
       <div class="body" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="${escapeHtml(t('dashboard.noteText'))}" title="${escapeHtml(t('dashboard.clickToEdit'))}">${sanitizeHtml(note.content)}</div>
+      ${tags ? `<div class="tags">${tags}</div>` : ''}
       <div class="footer">
         <select class="dash-scope-select" aria-label="${escapeHtml(t('dashboard.scopeLabel'))}" title="${escapeHtml(t('dashboard.scopeLabel'))}">
           <option value="exact" ${scope === 'exact' ? 'selected' : ''}>${escapeHtml(t('dashboard.scopeExact'))}</option>
@@ -101,19 +119,21 @@ function renderNotes() {
 
     const scopeSel = card.querySelector('.dash-scope-select');
     scopeSel.onchange = async (e) => {
-      const newScope = e.target.value;
-      note.urlScope = newScope;
-      await chrome.storage.local.set({ notes });
+      const current = notes.find(n => n.id === note.id); // the list may have been reloaded meanwhile
+      if (!current) return;
+      current.urlScope = e.target.value;
+      await store({ notes });
     };
 
     // Save inline editing changes on blur
     const bodyEl = card.querySelector('.body');
+    const shownContent = bodyEl.innerHTML;
     bodyEl.onblur = async () => {
-      const newContent = sanitizeHtml(bodyEl.innerHTML);
-      if (newContent !== note.content) {
-        note.content = newContent;
-        await chrome.storage.local.set({ notes });
-      }
+      if (bodyEl.innerHTML === shownContent) return; // not edited: keep what is stored
+      const current = notes.find(n => n.id === note.id);
+      if (!current) return;
+      current.content = sanitizeHtml(bodyEl.innerHTML);
+      await store({ notes });
     };
 
     grid.appendChild(card);
@@ -123,8 +143,9 @@ function renderNotes() {
 document.getElementById('search-notes').oninput = renderNotes;
 
 async function deleteNote(id) {
+  if (!confirm(t('dashboard.deleteNoteConfirm'))) return;
   notes = notes.filter(n => n.id !== id);
-  await chrome.storage.local.set({ notes });
+  await store({ notes });
   renderNotes();
 }
 
@@ -155,7 +176,7 @@ function renderRules() {
 
 async function deleteRule(index) {
   rules.hiddenUrls.splice(index, 1);
-  await chrome.storage.local.set({ rules });
+  await store({ rules });
   renderRules();
 }
 
@@ -164,7 +185,7 @@ async function addRule() {
   const value = input.value.trim();
   if (value && !rules.hiddenUrls.includes(value)) {
     rules.hiddenUrls.push(value);
-    await chrome.storage.local.set({ rules });
+    await store({ rules });
     renderRules();
   }
   input.value = '';
@@ -172,56 +193,158 @@ async function addRule() {
 document.getElementById('add-rule').onclick = addRule;
 document.getElementById('new-rule').addEventListener('keydown', (e) => { if (e.key === 'Enter') addRule(); });
 
-// Export / Import
-document.getElementById('export-btn').onclick = () => {
-  const data = JSON.stringify({ notes, rules }, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+// ── Settings ─────────────────────────────────────────────────────────────
+const byId = (id) => document.getElementById(id);
+
+async function renderSettings() {
+  const s = await chrome.storage.local.get(['extensionEnabled', 'autoShowFAB', 'bubbleOpacity']);
+  byId('set-enabled').checked = s.extensionEnabled !== false;
+  byId('set-autoshow').checked = s.autoShowFAB !== false;
+  const opacity = s.bubbleOpacity ?? 80;
+  byId('set-opacity').value = opacity;
+  byId('set-opacity-val').textContent = `${opacity}%`;
+  byId('set-language').value = I18n.language;
+}
+
+byId('set-language').replaceChildren(...I18n.languages.map(({ code, name }) => {
+  const option = new Option(name, code);
+  option.lang = code; // every language is named in its own language
+  return option;
+}));
+byId('set-language').onchange = (e) => I18n.setLanguage(e.target.value);
+byId('set-enabled').onchange = (e) => store({ extensionEnabled: e.target.checked });
+byId('set-autoshow').onchange = (e) => store({ autoShowFAB: e.target.checked });
+byId('set-opacity').oninput = (e) => {
+  byId('set-opacity-val').textContent = `${e.target.value}%`;
+  store({ bubbleOpacity: Number(e.target.value) });
+};
+
+// ── Backup, restore, delete ──────────────────────────────────────────────
+const DATA_KEYS = ['notes', 'highlights', 'drawings'];
+const DRAWING_TYPES = /^(path|rect|ellipse|line|arrow|sticker|blur|censor-[a-z]+)$/;
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+byId('export-btn').onclick = async () => {
+  const data = await chrome.storage.local.get([...DATA_KEYS, 'rules']);
+  const backup = {
+    app: 'WebNote',
+    version: chrome.runtime.getManifest().version,
+    exportedAt: new Date().toISOString(),
+    notes: data.notes || [],
+    highlights: data.highlights || [],
+    drawings: data.drawings || [],
+    rules: data.rules || { hiddenUrls: [] },
+  };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `webnote-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `webnote-backup-${backup.exportedAt.slice(0, 10)}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-document.getElementById('import-trigger').onclick = () => document.getElementById('import-file').click();
+// Checks the shape first, so a wrong file cannot replace the user's data with garbage, and cleans
+// note bodies, because those are shown as HTML on web pages. Throws if the file is not usable.
+function readBackup(text) {
+  const data = JSON.parse(text);
+  if (!isObject(data)) throw new Error('not a backup');
+  const parts = {};
+  for (const key of DATA_KEYS) {
+    if (data[key] === undefined) continue; // older exports hold notes and rules only
+    if (!Array.isArray(data[key]) || !data[key].every(isObject)) throw new Error(`${key} must be a list`);
+    parts[key] = data[key];
+  }
+  if (data.rules !== undefined) {
+    if (!(isObject(data.rules) && Array.isArray(data.rules.hiddenUrls))) throw new Error('rules are malformed');
+    parts.rules = { ...data.rules, hiddenUrls: data.rules.hiddenUrls.map(String) };
+  }
+  if (!Object.keys(parts).length) throw new Error('nothing to import');
+  if (parts.notes) {
+    parts.notes = parts.notes.map((n) => ({
+      ...n,
+      id: String(n.id ?? crypto.randomUUID()),
+      title: String(n.title ?? ''),
+      content: sanitizeHtml(n.content),
+      tags: tagsOf(n),
+    }));
+  }
+  if (parts.drawings) parts.drawings = parts.drawings.filter((d) => typeof d.type === 'string' && DRAWING_TYPES.test(d.type));
+  return parts;
+}
 
-document.getElementById('import-file').onchange = (e) => {
+function describe(parts) {
+  const lines = [];
+  if (parts.notes) lines.push(t('dashboard.partNotes', { n: parts.notes.length }));
+  if (parts.highlights) lines.push(t('dashboard.partHighlights', { n: parts.highlights.length }));
+  if (parts.drawings) lines.push(t('dashboard.partDrawings', { n: parts.drawings.length }));
+  if (parts.rules) lines.push(t('dashboard.partRules', { n: parts.rules.hiddenUrls.length }));
+  return lines.join('\n');
+}
+
+byId('import-trigger').onclick = () => byId('import-file').click();
+
+byId('import-file').onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async (event) => {
-    try {
-      const data = JSON.parse(event.target.result);
-      // Check the shape first so a wrong file cannot replace the user's notes with garbage.
-      if (data.notes !== undefined && !Array.isArray(data.notes)) throw new Error('notes must be a list');
-      if (data.rules !== undefined && !(data.rules && Array.isArray(data.rules.hiddenUrls))) throw new Error('rules are malformed');
-      if (!data.notes && !data.rules) throw new Error('nothing to import');
-      if (data.notes) notes = data.notes;
-      if (data.rules) rules = data.rules;
-      await chrome.storage.local.set({ notes, rules });
-      renderAll();
-      alert(t('dashboard.importOk'));
-    } catch (err) {
-      alert(t('dashboard.importFail'));
-    } finally {
-      e.target.value = '';
-    }
-  };
-  reader.readAsText(file);
+  try {
+    const parts = readBackup(await file.text());
+    if (!confirm(`${t('dashboard.restoreConfirm')}\n\n${describe(parts)}`)) return;
+    if (parts.notes) notes = parts.notes;
+    if (parts.rules) rules = parts.rules;
+    await store(parts);
+    renderAll();
+    alert(t('dashboard.importOk'));
+  } catch (err) {
+    alert(t('dashboard.importFail'));
+  } finally {
+    e.target.value = '';
+  }
 };
 
-// A language picked in the popup is applied here straight away, even while this page is open.
+byId('delete-all').onclick = async () => {
+  const data = await chrome.storage.local.get(DATA_KEYS);
+  const count = Object.fromEntries(DATA_KEYS.map((key) => [key, (data[key] || []).length]));
+  if (!DATA_KEYS.some((key) => count[key])) { alert(t('dashboard.nothingToDelete')); return; }
+  if (!confirm(t('dashboard.deleteAllConfirm', count))) return;
+  notes = [];
+  await store({ notes: [], highlights: [], drawings: [] });
+  renderNotes();
+};
+
+// ── Live updates ─────────────────────────────────────────────────────────
+// Changes made on web pages or in the popup appear here at once. While a note is being edited the
+// list is redrawn only after the cursor has left it.
+let stale = false;
+const editing = () => Boolean(document.activeElement?.closest('.note-card .body'));
+function refresh() {
+  if (editing()) stale = true;
+  else renderAll();
+}
+byId('notes-grid').addEventListener('focusout', () => setTimeout(() => {
+  if (stale && !editing()) { stale = false; renderAll(); }
+}, 0));
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || changes.lastWrite?.newValue?.by === WRITER) return;
+  if (changes.extensionEnabled || changes.autoShowFAB || changes.bubbleOpacity) renderSettings();
+  if (changes.notes) notes = changes.notes.newValue || [];
+  if (changes.rules) rules = changes.rules.newValue || { hiddenUrls: [] };
+  if (changes.notes || changes.rules) refresh();
+});
+
+// A language picked here or in the popup is applied straight away.
 I18n.onChange(() => {
   I18n.apply(document);
   renderAll();
+  renderSettings();
 });
 
 (async () => {
   try {
     await I18n.init();
     I18n.apply(document);
-    await loadData();
+    byId('app-version').textContent = `WebNote v${chrome.runtime.getManifest().version}`;
+    await Promise.all([loadData(), renderSettings()]);
   } finally {
     document.documentElement.classList.remove('i18n-loading');
   }
